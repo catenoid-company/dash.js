@@ -43,7 +43,7 @@ const uuid = '616c7469-6361-7374-2d50-726f74656374';
 const systemString = ProtectionConstants.ALTIPROTECT_KEYSTEM_STRING;
 const schemeIdURI = 'urn:uuid:' + uuid;
 
-function KeySystemWidevine(config) {
+function KeySystemAltiProtect(config) {
 
     config = config || {};
     let instance;
@@ -133,5 +133,5 @@ function KeySystemWidevine(config) {
     return instance;
 }
 
-KeySystemWidevine.__dashjs_factory_name = 'KeySystemAltiProtect';
-export default dashjs.FactoryMaker.getSingletonFactory(KeySystemWidevine); /* jshint ignore:line */
+KeySystemAltiProtect.__dashjs_factory_name = 'KeySystemAltiProtect';
+export default dashjs.FactoryMaker.getSingletonFactory(KeySystemAltiProtect); /* jshint ignore:line */

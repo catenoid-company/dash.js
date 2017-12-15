@@ -29,56 +29,9 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * CastLabs DRMToday License Server implementation
- *
- * @implements LicenseServer
- * @class
- */
-
-import ProtectionConstants from '../../constants/ProtectionConstants';
-
-function DRMToday(config) {
-
-    config = config || {};
-    const BASE64 = config.BASE64;
-
-    const keySystems = {};
-    keySystems[ProtectionConstants.WIDEVINE_KEYSTEM_STRING] = {
-        responseType: 'json',
-        getLicenseMessage: function (response) {
-            return BASE64.decodeArray(response.license);
-        },
-        getErrorResponse: function (response) {
-            return response;
-        }
-    };
-    keySystems[ProtectionConstants.ALTIPROTECT_KEYSTEM_STRING] = {
-        responseType: 'json',
-        getLicenseMessage: function (response) {
-            return BASE64.decodeArray(response.license);
-        },
-        getErrorResponse: function (response) {
-            return response;
-        }
-    };
-    keySystems[ProtectionConstants.PLAYREADY_KEYSTEM_STRING] = {
-        responseType: 'arraybuffer',
-        getLicenseMessage: function (response) {
-            return response;
-        },
-        getErrorResponse: function (response) {
-            return String.fromCharCode.apply(null, new Uint8Array(response));
-        }
-    };
+function AltiProtect() {
 
     let instance;
-
-    function checkConfig() {
-        if (!BASE64 || !BASE64.hasOwnProperty('decodeArray')) {
-            throw new Error('Missing config parameter(s)');
-        }
-    }
 
     function getServerURLFromMessage(url /*, message, messageType*/) {
         return url;
@@ -88,17 +41,16 @@ function DRMToday(config) {
         return 'POST';
     }
 
-    function getResponseType(keySystemStr/*, messageType*/) {
-        return keySystems[keySystemStr].responseType;
+    function getResponseType(/*keySystemStr, messageType*/) {
+        return 'arraybuffer';
     }
 
-    function getLicenseMessage(serverResponse, keySystemStr/*, messageType*/) {
-        checkConfig();
-        return keySystems[keySystemStr].getLicenseMessage(serverResponse);
+    function getLicenseMessage(serverResponse/*, keySystemStr, messageType*/) {
+        return serverResponse;
     }
 
-    function getErrorResponse(serverResponse, keySystemStr/*, messageType*/) {
-        return keySystems[keySystemStr].getErrorResponse(serverResponse);
+    function getErrorResponse(serverResponse/*, keySystemStr, messageType*/) {
+        return String.fromCharCode.apply(null, new Uint8Array(serverResponse));
     }
 
     instance = {
@@ -112,5 +64,5 @@ function DRMToday(config) {
     return instance;
 }
 
-DRMToday.__dashjs_factory_name = 'DRMToday';
-export default dashjs.FactoryMaker.getSingletonFactory(DRMToday); /* jshint ignore:line */
+AltiProtect.__dashjs_factory_name = 'AltiProtect';
+export default dashjs.FactoryMaker.getSingletonFactory(AltiProtect); /* jshint ignore:line */

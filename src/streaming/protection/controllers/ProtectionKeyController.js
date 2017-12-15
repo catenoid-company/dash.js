@@ -33,9 +33,11 @@ import KeySystemClearKey from './../drm/KeySystemClearKey';
 import KeySystemW3CClearKey from './../drm/KeySystemW3CClearKey';
 import KeySystemWidevine from './../drm/KeySystemWidevine';
 import KeySystemPlayReady from './../drm/KeySystemPlayReady';
+import KeySystemAltiProtect from './../drm/KeySystemAltiProtect';
 import DRMToday from './../servers/DRMToday';
 import PlayReady from './../servers/PlayReady';
 import Widevine from './../servers/Widevine';
+import AltiProtect from './../servers/AltiProtect';
 import ClearKey from './../servers/ClearKey';
 import ProtectionConstants from '../../constants/ProtectionConstants';
 
@@ -77,6 +79,10 @@ function ProtectionKeyController() {
 
         // Widevine
         keySystem = KeySystemWidevine(context).getInstance({ BASE64: BASE64 });
+        keySystems.push(keySystem);
+
+        // AltiProtect
+        keySystem = KeySystemAltiProtect(context).getInstance({ BASE64: BASE64 });
         keySystems.push(keySystem);
 
         // ClearKey
@@ -276,6 +282,8 @@ function ProtectionKeyController() {
             licenseServerData = DRMToday(context).getInstance({ BASE64: BASE64 });
         } else if (keySystem.systemString === ProtectionConstants.WIDEVINE_KEYSTEM_STRING) {
             licenseServerData = Widevine(context).getInstance();
+        } else if (keySystem.systemString === ProtectionConstants.ALTIPROTECT_KEYSTEM_STRING) {
+            licenseServerData = AltiProtect(context).getInstance();
         } else if (keySystem.systemString === ProtectionConstants.PLAYREADY_KEYSTEM_STRING) {
             licenseServerData = PlayReady(context).getInstance();
         } else if (keySystem.systemString === ProtectionConstants.CLEARKEY_KEYSTEM_STRING) {

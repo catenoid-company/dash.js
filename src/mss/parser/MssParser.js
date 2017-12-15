@@ -507,6 +507,26 @@ function MssParser(config) {
         return contentProtection;
     }
 
+    function createAltiProtectContentProtection(/*protectionHeader*/) {
+        const keySystems = protectionController ? protectionController.getKeySystems() : null;
+        let ksAltiProtect;
+
+        for (let i = 0; i < keySystems.length; i++) {
+            if (keySystems[i].systemString && keySystems[i].systemString.indexOf('altiprotect') !== -1) {
+                ksAltiProtect = keySystems[i];
+                break;
+            }
+        }
+
+        var contentProtection = {};
+        if (ksAltiProtect) {
+            contentProtection.schemeIdUri = ksAltiProtect.schemeIdURI;
+            contentProtection.value = ksAltiProtect.systemString;
+        }
+
+        return contentProtection;
+    }
+
     function processManifest(xmlDoc, manifestLoadedTime) {
         let manifest = {};
         let contentProtections = [];
@@ -565,6 +585,11 @@ function MssParser(config) {
 
             // Create ContentProtection for Widevine (as a CENC protection)
             contentProtection = createWidevineContentProtection(protectionHeader);
+            contentProtection['cenc:default_KID'] = KID;
+            contentProtections.push(contentProtection);
+
+            // Create ContentProtection for AltiProtect (as a CENC protection)
+            contentProtection = createAltiProtectContentProtection(protectionHeader);
             contentProtection['cenc:default_KID'] = KID;
             contentProtections.push(contentProtection);
 
