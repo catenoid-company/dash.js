@@ -39,6 +39,7 @@ class ProtectionConstants {
     init () {
         this.CLEARKEY_KEYSTEM_STRING = 'org.w3.clearkey';
         this.WIDEVINE_KEYSTEM_STRING = 'com.widevine.alpha';
+        this.ALTIPROTECT_KEYSTEM_STRING = 'com.alticast.altiprotect';
         this.PLAYREADY_KEYSTEM_STRING = 'com.microsoft.playready';
     }
 
