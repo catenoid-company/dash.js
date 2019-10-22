@@ -22,8 +22,7 @@
             var video,
                 player,
                 url_drm = "https://skylife-tm-ch147.akamaized.net/live-01-ch147/ch147_720p/manifest.mpd",
-                url_nondrm = "https://skylife-tm-ch147.akamaized.net/live-01-ch147-nondrm/ch147_720p/manifest.mpd",
-                url_drmabr = "https://skylife-tm-ch147.akamaized.net/live-01-ch147/smil:ch147_test02.smil/manifest.mpd";
+                url_nondrm = "https://skylife-tm-ch147.akamaized.net/live-01-ch147-nondrm/ch147_720p/manifest.mpd";
 
             video = document.querySelector("video");
             player = dashjs.MediaPlayer().create();
@@ -33,7 +32,7 @@
                     }
                 }
             );
-            player.initialize(video, url_drm, true);
+            player.initialize(video, url_nondrm, true);
             player.setProtectionData(protData);
         }
     </script>

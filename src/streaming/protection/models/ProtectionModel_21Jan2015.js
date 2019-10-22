@@ -60,7 +60,8 @@ function ProtectionModel_21Jan2015(config) {
         mediaKeys,
         sessions,
         eventHandler,
-        protectionKeyController;
+        protectionKeyController,
+        manifestType;
 
     function setup() {
         logger = debug.getLogger(instance);
@@ -70,6 +71,14 @@ function ProtectionModel_21Jan2015(config) {
         sessions = [];
         protectionKeyController = ProtectionKeyController(context).getInstance();
         eventHandler = createEventHandler();
+    }
+
+    function getManifestType() {
+        return manifestType;
+    }
+
+    function setManifestType(value) {
+        manifestType = value || 'static';
     }
 
     function reset() {
@@ -279,6 +288,8 @@ function ProtectionModel_21Jan2015(config) {
         });
     }
 
+    //let isRequestedOnce = false;
+    let mediaKeySystemAccessStorage;
     function requestKeySystemAccessInternal(ksConfigurations, idx) {
 
         if (navigator.requestMediaKeySystemAccess === undefined ||
@@ -297,21 +308,65 @@ function ProtectionModel_21Jan2015(config) {
                 systemString += '.recommendation';
             }
 
-            navigator.requestMediaKeySystemAccess(systemString, configs).then(function (mediaKeySystemAccess) {
-                // Chrome 40 does not currently implement MediaKeySystemAccess.getConfiguration()
-                const configuration = (typeof mediaKeySystemAccess.getConfiguration === 'function') ?
-                        mediaKeySystemAccess.getConfiguration() : null;
-                const keySystemAccess = new KeySystemAccess(keySystem, configuration);
-                keySystemAccess.mksa = mediaKeySystemAccess;
-                eventBus.trigger(events.KEY_SYSTEM_ACCESS_COMPLETE, {data: keySystemAccess});
+            // 원본 소스
+            // navigator.requestMediaKeySystemAccess(systemString, configs).then(function (mediaKeySystemAccess) {
+            //     // Chrome 40 does not currently implement MediaKeySystemAccess.getConfiguration()
+            //     const configuration = (typeof mediaKeySystemAccess.getConfiguration === 'function') ?
+            //         mediaKeySystemAccess.getConfiguration() : null;
+            //     const keySystemAccess = new KeySystemAccess(keySystem, configuration);
+            //     keySystemAccess.mksa = mediaKeySystemAccess;
+            //     eventBus.trigger(events.KEY_SYSTEM_ACCESS_COMPLETE, {data: keySystemAccess});
+            // }).catch(function (error) {
+            //     if (++i < ksConfigurations.length) {
+            //         requestKeySystemAccessInternal(ksConfigurations, i);
+            //     } else {
+            //         eventBus.trigger(events.KEY_SYSTEM_ACCESS_COMPLETE, {error: 'Key system access denied! ' + error.message});
+            //     }
+            // });
 
-            }).catch(function (error) {
-                if (++i < ksConfigurations.length) {
-                    requestKeySystemAccessInternal(ksConfigurations, i);
-                } else {
-                    eventBus.trigger(events.KEY_SYSTEM_ACCESS_COMPLETE, {error: 'Key system access denied! ' + error.message});
-                }
-            });
+            // navigator.requestMediaKeySystemAccess는 한번만 호출하도록 변경.
+            const KeySystemAccessed = function() {
+                // Chrome 40 does not currently implement MediaKeySystemAccess.getConfiguration()
+                const configuration = (typeof mediaKeySystemAccessStorage.getConfiguration === 'function') ?
+                    mediaKeySystemAccessStorage.getConfiguration() : null;
+                const keySystemAccess = new KeySystemAccess(keySystem, configuration);
+                keySystemAccess.mksa = mediaKeySystemAccessStorage;
+                eventBus.trigger(events.KEY_SYSTEM_ACCESS_COMPLETE, {data: keySystemAccess});
+            };
+
+            if (!mediaKeySystemAccessStorage) {
+                navigator.requestMediaKeySystemAccess(systemString, configs).then(function (mediaKeySystemAccess) {
+                    mediaKeySystemAccessStorage = mediaKeySystemAccess;
+                    KeySystemAccessed();
+                }).catch(function (error) {
+                    if (++i < ksConfigurations.length) {
+                        requestKeySystemAccessInternal(ksConfigurations, i);
+                    } else {
+                        eventBus.trigger(events.KEY_SYSTEM_ACCESS_COMPLETE, {error: 'Key system access denied! ' + error.message});
+                    }
+                });
+            } else {
+                KeySystemAccessed();
+            }
+
+            // manifestType이 dynamic인 경우, 한번만 호출하도록 변경
+            // if (getManifestType() !== 'dynamic' || !isRequestedOnce) {
+            //     navigator.requestMediaKeySystemAccess(systemString, configs).then(function (mediaKeySystemAccess) {
+            //         // Chrome 40 does not currently implement MediaKeySystemAccess.getConfiguration()
+            //         const configuration = (typeof mediaKeySystemAccess.getConfiguration === 'function') ?
+            //             mediaKeySystemAccess.getConfiguration() : null;
+            //         const keySystemAccess = new KeySystemAccess(keySystem, configuration);
+            //         keySystemAccess.mksa = mediaKeySystemAccess;
+            //         eventBus.trigger(events.KEY_SYSTEM_ACCESS_COMPLETE, {data: keySystemAccess});
+            //         if (getManifestType() === 'dynamic') isRequestedOnce = true;
+            //     }).catch(function (error) {
+            //         if (++i < ksConfigurations.length) {
+            //             requestKeySystemAccessInternal(ksConfigurations, i);
+            //         } else {
+            //             eventBus.trigger(events.KEY_SYSTEM_ACCESS_COMPLETE, {error: 'Key system access denied! ' + error.message});
+            //         }
+            //     });
+            // }
         })(idx);
     }
 
@@ -473,7 +528,9 @@ function ProtectionModel_21Jan2015(config) {
         removeKeySession: removeKeySession,
         closeKeySession: closeKeySession,
         stop: stop,
-        reset: reset
+        reset: reset,
+        getManifestType: getManifestType,
+        setManifestType: setManifestType
     };
 
     setup();
