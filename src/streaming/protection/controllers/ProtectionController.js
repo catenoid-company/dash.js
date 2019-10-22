@@ -112,7 +112,7 @@ function ProtectionController(config) {
             throw new Error('mediaInfo can not be null or undefined');
         }
 
-        protectionModel.setManifestType(mediaInfo.streamInfo.manifestInfo.isDynamic ? "dynamic" : "static");
+        protectionModel.setManifestType(mediaInfo.streamInfo.manifestInfo.isDynamic ? 'dynamic' : 'static');
 
         checkConfig();
 

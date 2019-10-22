@@ -325,7 +325,7 @@ function ProtectionModel_21Jan2015(config) {
             // });
 
             // navigator.requestMediaKeySystemAccess는 한번만 호출하도록 변경.
-            const KeySystemAccessed = function() {
+            const KeySystemAccessed = function () {
                 // Chrome 40 does not currently implement MediaKeySystemAccess.getConfiguration()
                 const configuration = (typeof mediaKeySystemAccessStorage.getConfiguration === 'function') ?
                     mediaKeySystemAccessStorage.getConfiguration() : null;
