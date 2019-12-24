@@ -65,6 +65,7 @@ function ListSegmentsGetter(config, isDynamic) {
             s = list.SegmentURL_asArray[periodSegIdx];
 
             seg = getIndexBasedSegment(timelineConverter, isDynamic, representation, periodSegIdx);
+            if (typeof seg == 'undefined' || seg == null) return null;
             seg.replacementTime = (start + periodSegIdx - 1) * representation.segmentDuration;
             seg.media = s.media ? s.media : '';
             seg.mediaRange = s.mediaRange;
