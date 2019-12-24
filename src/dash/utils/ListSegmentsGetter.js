@@ -64,6 +64,7 @@ function ListSegmentsGetter(config, isDynamic) {
             const s = list.SegmentURL_asArray[index];
 
             segment = getIndexBasedSegment(timelineConverter, isDynamic, representation, index);
+            if (typeof segment === 'undefined' || segment === null) return null;
             segment.replacementTime = (start + index - 1) * representation.segmentDuration;
             segment.media = s.media ? s.media : '';
             segment.mediaRange = s.mediaRange;
