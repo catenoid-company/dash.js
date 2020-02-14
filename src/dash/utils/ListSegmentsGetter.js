@@ -90,7 +90,7 @@ function ListSegmentsGetter(config, isDynamic) {
             return null;
         }
 
-        const periodTime = timelineConverter.calcPeriodRelativeTimeFromMpdRelativeTime(representation, requestedTime);
+        const periodTime = (timelineConverter.calcPeriodRelativeTimeFromMpdRelativeTime(representation, requestedTime)).toFixed(5) * 1;
         const index = Math.floor(periodTime / duration);
 
         return getSegmentByIndex(representation, index);
