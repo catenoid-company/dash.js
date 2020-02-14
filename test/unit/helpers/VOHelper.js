@@ -1,10 +1,10 @@
-import StreamInfo from '../../../src/streaming/vo/StreamInfo';
-import MediaInfo from '../../../src/streaming/vo/MediaInfo';
+import StreamInfo from '../../../src/dash/vo/StreamInfo';
+import MediaInfo from '../../../src/dash/vo/MediaInfo';
 import MpdHelper from './MPDHelper';
 import SpecHelper from './SpecHelper';
 import Representation from '../../../src/dash/vo/Representation';
 import FragmentRequest from '../../../src/streaming/vo/FragmentRequest';
-import {HTTPRequest} from '../../../src/streaming/vo/metrics/HTTPRequest';
+import { HTTPRequest } from '../../../src/streaming/vo/metrics/HTTPRequest';
 
 class VoHelper {
     constructor() {
@@ -55,11 +55,11 @@ class VoHelper {
         return adaptation;
     }
 
-    createRepresentation(type) {
+    createRepresentation(type, index) {
         var rep = new Representation();
 
         rep.id = null;
-        rep.index = 0;
+        rep.index = index || 0;
         rep.adaptation = this.createAdaptation(type);
         rep.fragmentInfoType = null;
         rep.initialization = 'https://dash.akamaized.net/envivio/dashpr/clear/video4/Header.m4s';
@@ -77,7 +77,7 @@ class VoHelper {
         return rep;
     }
 
-    createRequest(type) {
+    createRequest(type, state) {
         var req = {};
         req.action = FragmentRequest.ACTION_DOWNLOAD;
         req.quality = 0;
@@ -92,8 +92,10 @@ class VoHelper {
             req.startTime = 0;
             req.duration = 4;
             req.index = 0;
-        } else if (type === FragmentRequest.ACTION_COMPLETE) {
-            req.action = type;
+        }
+
+        if (state === FragmentRequest.ACTION_COMPLETE) {
+            req.action = FragmentRequest.ACTION_COMPLETE;
             req.url = undefined;
             req.quality = NaN;
         }
@@ -101,8 +103,8 @@ class VoHelper {
         return req;
     }
 
-    getDummyRepresentation(type) {
-        return this.voRep || this.createRepresentation(type);
+    getDummyRepresentation(type, index) {
+        return this.voRep || this.createRepresentation(type, index);
     }
 
     getDummyMpd(type) {
@@ -121,8 +123,8 @@ class VoHelper {
         return this.createRequest(HTTPRequest.INIT_SEGMENT_TYPE);
     }
 
-    getCompleteRequest() {
-        return this.createRequest(FragmentRequest.ACTION_COMPLETE);
+    getCompleteRequest(type) {
+        return this.createRequest(type, FragmentRequest.ACTION_COMPLETE);
     }
 
     getDummyStreamInfo() {

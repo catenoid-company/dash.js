@@ -29,21 +29,23 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 import Constants from './constants/Constants';
-import LiveEdgeFinder from './utils/LiveEdgeFinder';
 import BufferController from './controllers/BufferController';
 import TextBufferController from './text/TextBufferController';
 import ScheduleController from './controllers/ScheduleController';
 import RepresentationController from '../dash/controllers/RepresentationController';
 import FactoryMaker from '../core/FactoryMaker';
-
+import { checkInteger } from './utils/SupervisorTools';
+import EventBus from '../core/EventBus';
+import Events from '../core/events/Events';
 import DashHandler from '../dash/DashHandler';
+import Errors from '../core/errors/Errors';
 
 function StreamProcessor(config) {
 
     config = config || {};
     let context = this.context;
+    let eventBus = EventBus(context).getInstance();
 
-    let indexHandler;
     let type = config.type;
     let errHandler = config.errHandler;
     let mimeType = config.mimeType;
@@ -57,47 +59,42 @@ function StreamProcessor(config) {
     let streamController = config.streamController;
     let mediaController = config.mediaController;
     let textController = config.textController;
-    let sourceBufferController = config.sourceBufferController;
-    let domStorage = config.domStorage;
-    let metricsModel = config.metricsModel;
     let dashMetrics = config.dashMetrics;
-    let dashManifestModel = config.dashManifestModel;
+    let settings = config.settings;
 
     let instance,
         mediaInfo,
         mediaInfoArr,
         bufferController,
         scheduleController,
-        liveEdgeFinder,
         representationController,
         fragmentModel,
-        spExternalControllers;
+        spExternalControllers,
+        indexHandler;
 
     function setup() {
-        if (playbackController && playbackController.getIsDynamic()) {
-            liveEdgeFinder = LiveEdgeFinder(context).create({
-                timelineConverter: timelineConverter,
-                streamProcessor: instance
-            });
-        }
         resetInitialSettings();
+
+        eventBus.on(Events.BUFFER_LEVEL_UPDATED, onBufferLevelUpdated, instance);
+        eventBus.on(Events.DATA_UPDATE_COMPLETED, onDataUpdateCompleted, instance);
     }
 
     function initialize(mediaSource) {
-
         indexHandler = DashHandler(context).create({
+            type: type,
             mimeType: mimeType,
             timelineConverter: timelineConverter,
             dashMetrics: dashMetrics,
-            metricsModel: metricsModel,
             mediaPlayerModel: mediaPlayerModel,
             baseURLController: config.baseURLController,
-            errHandler: errHandler
+            errHandler: errHandler,
+            settings: settings,
+            streamInfo: getStreamInfo()
         });
 
         // initialize controllers
-        indexHandler.initialize(this);
-        abrController.registerStreamType(type, this);
+        indexHandler.initialize(playbackController.getIsDynamic());
+        abrController.registerStreamType(type, instance);
 
         fragmentModel = stream.getFragmentController().getModel(type);
         fragmentModel.setStreamProcessor(instance);
@@ -105,36 +102,32 @@ function StreamProcessor(config) {
         bufferController = createBufferControllerForType(type);
         scheduleController = ScheduleController(context).create({
             type: type,
-            metricsModel: metricsModel,
+            mimeType: mimeType,
             adapter: adapter,
             dashMetrics: dashMetrics,
-            dashManifestModel: dashManifestModel,
             timelineConverter: timelineConverter,
             mediaPlayerModel: mediaPlayerModel,
             abrController: abrController,
             playbackController: playbackController,
             streamController: streamController,
             textController: textController,
-            sourceBufferController: sourceBufferController,
-            streamProcessor: this
+            streamProcessor: instance,
+            mediaController: mediaController,
+            settings: settings
         });
-
         representationController = RepresentationController(context).create();
-
         representationController.setConfig({
             abrController: abrController,
-            domStorage: domStorage,
-            metricsModel: metricsModel,
             dashMetrics: dashMetrics,
-            dashManifestModel: dashManifestModel,
             manifestModel: manifestModel,
             playbackController: playbackController,
             timelineConverter: timelineConverter,
-            streamProcessor: this
+            streamProcessor: instance,
+            type: type,
+            streamId: getStreamInfo() ? getStreamInfo().id : null
         });
         bufferController.initialize(mediaSource);
         scheduleController.initialize();
-        representationController.initialize();
     }
 
     function registerExternalController(controller) {
@@ -163,12 +156,11 @@ function StreamProcessor(config) {
         unregisterAllExternalController();
     }
 
-    function reset(errored) {
-
+    function reset(errored, keepBuffers) {
         indexHandler.reset();
 
         if (bufferController) {
-            bufferController.reset(errored);
+            bufferController.reset(errored, keepBuffers);
             bufferController = null;
         }
 
@@ -189,17 +181,38 @@ function StreamProcessor(config) {
             controller.reset();
         });
 
+        eventBus.off(Events.BUFFER_LEVEL_UPDATED, onBufferLevelUpdated, instance);
+        eventBus.off(Events.DATA_UPDATE_COMPLETED, onDataUpdateCompleted, instance);
+
         resetInitialSettings();
         type = null;
         stream = null;
-        if (liveEdgeFinder) {
-            liveEdgeFinder.reset();
-            liveEdgeFinder = null;
-        }
     }
 
     function isUpdating() {
         return representationController ? representationController.isUpdating() : false;
+    }
+
+    function onDataUpdateCompleted(e) {
+        if (e.sender.getType() !== getType() || e.sender.getStreamId() !== getStreamInfo().id || !e.error || e.error.code !== Errors.SEGMENTS_UPDATE_FAILED_ERROR_CODE) return;
+
+        addDVRMetric();
+    }
+
+    function onBufferLevelUpdated(e) {
+        if (e.sender.getStreamProcessor() !== instance) return;
+        let manifest = manifestModel.getValue();
+        if (!manifest.doNotUpdateDVRWindowOnBufferUpdated) {
+            addDVRMetric();
+        }
+    }
+
+    function addDVRMetric() {
+        const streamInfo = getStreamInfo();
+        const manifestInfo = streamInfo ? streamInfo.manifestInfo : null;
+        const isDynamic = manifestInfo ? manifestInfo.isDynamic : null;
+        const range = timelineConverter.calcSegmentAvailabilityRange(representationController.getCurrentRepresentation(), isDynamic);
+        dashMetrics.addDVRInfo(getType(), playbackController.getTime(), manifestInfo, range);
     }
 
     function getType() {
@@ -208,14 +221,6 @@ function StreamProcessor(config) {
 
     function getRepresentationController() {
         return representationController;
-    }
-
-    function getIndexHandler() {
-        return indexHandler;
-    }
-
-    function getFragmentController() {
-        return stream ? stream.getFragmentController() : null;
     }
 
     function getBuffer() {
@@ -234,26 +239,61 @@ function StreamProcessor(config) {
         return fragmentModel;
     }
 
-    function getLiveEdgeFinder() {
-        return liveEdgeFinder;
-    }
-
     function getStreamInfo() {
         return stream ? stream.getStreamInfo() : null;
     }
 
-    function getEventController() {
-        return stream ? stream.getEventController() : null;
+    function addInbandEvents(events) {
+        if (stream) {
+            stream.addInbandEvents(events);
+        }
     }
 
-    function updateMediaInfo(newMediaInfo) {
+    function selectMediaInfo(newMediaInfo) {
         if (newMediaInfo !== mediaInfo && (!newMediaInfo || !mediaInfo || (newMediaInfo.type === mediaInfo.type))) {
             mediaInfo = newMediaInfo;
         }
+
+        const streamInfo = getStreamInfo();
+        const newRealAdaptation = adapter.getRealAdaptation(streamInfo, mediaInfo);
+        const voRepresentations = adapter.getVoRepresentations(mediaInfo);
+
+        if (representationController) {
+            const realAdaptation = representationController.getData();
+            const maxQuality = abrController.getTopQualityIndexFor(type, streamInfo ? streamInfo.id : null);
+            const minIdx = abrController.getMinAllowedIndexFor(type);
+
+            let quality,
+                averageThroughput;
+            let bitrate = null;
+
+            if ((realAdaptation === null || (realAdaptation.id != newRealAdaptation.id)) && type !== Constants.FRAGMENTED_TEXT) {
+                averageThroughput = abrController.getThroughputHistory().getAverageThroughput(type);
+                bitrate = averageThroughput || abrController.getInitialBitrateFor(type);
+                quality = abrController.getQualityForBitrate(mediaInfo, bitrate);
+            } else {
+                quality = abrController.getQualityFor(type);
+            }
+
+            if (minIdx !== undefined && quality < minIdx) {
+                quality = minIdx;
+            }
+            if (quality > maxQuality) {
+                quality = maxQuality;
+            }
+
+            representationController.updateData(newRealAdaptation, voRepresentations, type, quality);
+        }
+    }
+
+    function addMediaInfo(newMediaInfo, selectNewMediaInfo) {
         if (mediaInfoArr.indexOf(newMediaInfo) === -1) {
             mediaInfoArr.push(newMediaInfo);
         }
-        adapter.updateData(this);
+
+        if (selectNewMediaInfo) {
+            this.selectMediaInfo(newMediaInfo);
+        }
     }
 
     function getMediaInfoArr() {
@@ -268,38 +308,53 @@ function StreamProcessor(config) {
         return bufferController.getMediaSource();
     }
 
+    function setMediaSource(mediaSource) {
+        bufferController.setMediaSource(mediaSource, getMediaInfo());
+    }
+
+    function dischargePreBuffer() {
+        bufferController.dischargePreBuffer();
+    }
+
     function getScheduleController() {
         return scheduleController;
     }
 
-    function getCurrentRepresentationInfo() {
-        return adapter.getCurrentRepresentationInfo(representationController);
-    }
+    /**
+     * Get a specific voRepresentation. If quality parameter is defined, this function will return the voRepresentation for this quality.
+     * Otherwise, this function will return the current voRepresentation used by the representationController.
+     * @param {number} quality - quality index of the voRepresentaion expected.
+     */
+    function getRepresentationInfo(quality) {
+        let voRepresentation;
 
-    function getRepresentationInfoForQuality(quality) {
-        return adapter.getRepresentationInfoForQuality(representationController, quality);
+        if (quality !== undefined) {
+            checkInteger(quality);
+            voRepresentation = representationController ? representationController.getRepresentationForQuality(quality) : null;
+        } else {
+            voRepresentation = representationController ? representationController.getCurrentRepresentation() : null;
+        }
+
+        return adapter.convertDataToRepresentationInfo(voRepresentation);
     }
 
     function isBufferingCompleted() {
-        if (bufferController) {
-            return bufferController.getIsBufferingCompleted();
-        }
-
-        return false;
+        return bufferController ? bufferController.getIsBufferingCompleted() : false;
     }
 
     function getBufferLevel() {
-        return bufferController.getBufferLevel();
+        return bufferController ? bufferController.getBufferLevel() : 0;
     }
 
-    function switchInitData(representationId) {
+    function switchInitData(representationId, bufferResetEnabled) {
         if (bufferController) {
-            bufferController.switchInitData(getStreamInfo().id, representationId);
+            const streamInfo = getStreamInfo();
+            bufferController.switchInitData(streamInfo ? streamInfo.id : null, representationId, bufferResetEnabled);
         }
     }
 
-    function createBuffer() {
-        return (bufferController.getBuffer() || bufferController.createBuffer(mediaInfo));
+    function createBuffer(previousBuffers) {
+        return (bufferController.getBuffer() || bufferController.createBuffer(mediaInfo, previousBuffers));
     }
 
     function switchTrackAsked() {
@@ -312,10 +367,9 @@ function StreamProcessor(config) {
         if (type === Constants.VIDEO || type === Constants.AUDIO) {
             controller = BufferController(context).create({
                 type: type,
-                metricsModel: metricsModel,
+                dashMetrics: dashMetrics,
                 mediaPlayerModel: mediaPlayerModel,
                 manifestModel: manifestModel,
-                sourceBufferController: sourceBufferController,
                 errHandler: errHandler,
                 streamController: streamController,
                 mediaController: mediaController,
@@ -323,15 +377,16 @@ function StreamProcessor(config) {
                 textController: textController,
                 abrController: abrController,
                 playbackController: playbackController,
-                streamProcessor: instance
+                streamProcessor: instance,
+                settings: settings
             });
         } else {
             controller = TextBufferController(context).create({
                 type: type,
-                metricsModel: metricsModel,
+                mimeType: mimeType,
+                dashMetrics: dashMetrics,
                 mediaPlayerModel: mediaPlayerModel,
                 manifestModel: manifestModel,
-                sourceBufferController: sourceBufferController,
                 errHandler: errHandler,
                 streamController: streamController,
                 mediaController: mediaController,
@@ -339,11 +394,54 @@ function StreamProcessor(config) {
                 textController: textController,
                 abrController: abrController,
                 playbackController: playbackController,
-                streamProcessor: instance
+                streamProcessor: instance,
+                settings: settings
             });
         }
 
         return controller;
+    }
+
+    function setIndexHandlerTime(value) {
+        if (indexHandler) {
+            indexHandler.setCurrentTime(value);
+        }
+    }
+
+    function getIndexHandlerTime() {
+        return indexHandler ? indexHandler.getCurrentTime() : NaN;
+    }
+
+    function resetIndexHandler() {
+        if (indexHandler) {
+            indexHandler.resetIndex();
+        }
+    }
+
+    function getInitRequest(quality) {
+        checkInteger(quality);
+
+        const representation = representationController ? representationController.getRepresentationForQuality(quality) : null;
+
+        return indexHandler ? indexHandler.getInitRequest(getMediaInfo(), representation) : null;
+    }
+
+    function getFragmentRequest(representationInfo, time, options) {
+        let fragRequest = null;
+
+        if (indexHandler) {
+            const representation = representationController && representationInfo ? representationController.getRepresentationForQuality(representationInfo.quality) : null;
+
+            // if time and options are undefined, it means the next segment is requested
+            // otherwise, the segment at this specific time is requested.
+            if (time !== undefined && options !== undefined) {
+                fragRequest = indexHandler.getSegmentRequestForTime(getMediaInfo(), representation, time, options);
+            } else {
+                fragRequest = indexHandler.getNextSegmentRequest(getMediaInfo(), representation);
+            }
+        }
+
+        return fragRequest;
     }
 
     instance = {
@@ -353,33 +451,38 @@ function StreamProcessor(config) {
         getBufferController: getBufferController,
         getFragmentModel: getFragmentModel,
         getScheduleController: getScheduleController,
-        getLiveEdgeFinder: getLiveEdgeFinder,
-        getEventController: getEventController,
-        getFragmentController: getFragmentController,
         getRepresentationController: getRepresentationController,
-        getIndexHandler: getIndexHandler,
-        getCurrentRepresentationInfo: getCurrentRepresentationInfo,
-        getRepresentationInfoForQuality: getRepresentationInfoForQuality,
+        getRepresentationInfo: getRepresentationInfo,
         getBufferLevel: getBufferLevel,
         switchInitData: switchInitData,
         isBufferingCompleted: isBufferingCompleted,
         createBuffer: createBuffer,
         getStreamInfo: getStreamInfo,
-        updateMediaInfo: updateMediaInfo,
+        selectMediaInfo: selectMediaInfo,
+        addMediaInfo: addMediaInfo,
         switchTrackAsked: switchTrackAsked,
         getMediaInfoArr: getMediaInfoArr,
         getMediaInfo: getMediaInfo,
         getMediaSource: getMediaSource,
+        setMediaSource: setMediaSource,
+        dischargePreBuffer: dischargePreBuffer,
         getBuffer: getBuffer,
         setBuffer: setBuffer,
         registerExternalController: registerExternalController,
         unregisterExternalController: unregisterExternalController,
         getExternalControllers: getExternalControllers,
         unregisterAllExternalController: unregisterAllExternalController,
+        addInbandEvents: addInbandEvents,
+        setIndexHandlerTime: setIndexHandlerTime,
+        getIndexHandlerTime: getIndexHandlerTime,
+        resetIndexHandler: resetIndexHandler,
+        getInitRequest: getInitRequest,
+        getFragmentRequest: getFragmentRequest,
         reset: reset
     };
 
     setup();
+
     return instance;
 }
 StreamProcessor.__dashjs_factory_name = 'StreamProcessor';

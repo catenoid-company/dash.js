@@ -6,13 +6,22 @@ import Debug from '../../../core/Debug';
 function DroppedFramesRule() {
 
     const context = this.context;
-    const log = Debug(context).getInstance().log;
+    let instance,
+        logger;
 
     const DROPPED_PERCENTAGE_FORBID = 0.15;
     const GOOD_SAMPLE_SIZE = 375; //Don't apply the rule until this many frames have been rendered(and counted under those indices).
 
+    function setup() {
+        logger = Debug(context).getInstance().getLogger(instance);
+    }
 
     function getMaxIndex(rulesContext) {
+        const switchRequest = SwitchRequest(context).create();
+
+        if (!rulesContext || !rulesContext.hasOwnProperty('getDroppedFramesHistory')) {
+            return switchRequest;
+        }
         const droppedFramesHistory = rulesContext.getDroppedFramesHistory();
         if (droppedFramesHistory) {
             const dfh = droppedFramesHistory.getFrameHistory();
@@ -26,7 +35,7 @@ function DroppedFramesRule() {
 
                     if (totalFrames > GOOD_SAMPLE_SIZE && droppedFrames / totalFrames > DROPPED_PERCENTAGE_FORBID) {
                         maxIndex = i - 1;
-                        log('DroppedFramesRule, index: ' + maxIndex + ' Dropped Frames: ' + droppedFrames + ' Total Frames: ' + totalFrames);
+                        logger.debug('index: ' + maxIndex + ' Dropped Frames: ' + droppedFrames + ' Total Frames: ' + totalFrames);
                         break;
                     }
                 }
@@ -34,12 +43,16 @@ function DroppedFramesRule() {
             return SwitchRequest(context).create(maxIndex, {droppedFrames: droppedFrames});
         }
 
-        return SwitchRequest(context).create();
+        return switchRequest;
     }
 
-    return {
+    instance = {
         getMaxIndex: getMaxIndex
     };
+
+    setup();
+
+    return instance;
 }
 
 DroppedFramesRule.__dashjs_factory_name = 'DroppedFramesRule';

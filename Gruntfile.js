@@ -27,9 +27,10 @@ module.exports = function (grunt) {
         uglify: {
             options: {
                 banner: '/*! v<%= pkg.version %>-<%= githash.dist.short %>, <%= grunt.template.today("isoUtcDateTime") %> */',
-                sourceMap: true,
-                sourceMapIncludeSources: true,
-                sourceMapRoot: './src/',
+                sourceMap: {
+                    includeSources: true,
+                    root: './src/'
+                },
                 preserveComments: 'some',
                 mangle: true,
                 compress: {
@@ -191,7 +192,8 @@ module.exports = function (grunt) {
         babel: {
             options: {
                 sourceMap: true,
-                compact: true
+                compact: true,
+                presets: ['env']
             },
             es5: {
                 files: [{
@@ -366,7 +368,7 @@ module.exports = function (grunt) {
                     hideCredentials: true,
                     // disabling incrementalUpdates because this option is not working fine
                     incrementalUpdates: false,
-                    debug: false,
+                    debug: true,
                     port: 21
                 },
                 files: [
@@ -376,11 +378,11 @@ module.exports = function (grunt) {
                         src: [
                             'contrib/**',
                             'dist/**',
-                            'test/functional/test.html',
+                            'test/functional/tests.html',
                             'test/functional/testsCommon.js',
                             'test/functional/config/**',
                             'test/functional/tests/**',
-                            'samples/dash-if-reference-player/**'
+                            'samples/**'
                         ]
                     }
                 ]

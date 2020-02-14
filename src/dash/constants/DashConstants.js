@@ -120,9 +120,16 @@ class DashConstants {
         this.MIN_BUFFER_TIME = 'minBufferTime';
         this.MAX_SUBSEGMENT_DURATION = 'maxSubsegmentDuration';
         this.START = 'start';
+        this.AVAILABILITY_TIME_OFFSET = 'availabilityTimeOffset';
+        this.AVAILABILITY_TIME_COMPLETE = 'availabilityTimeComplete';
         this.CENC_DEFAULT_KID = 'cenc:default_KID';
         this.DVB_PRIORITY = 'dvb:priority';
         this.DVB_WEIGHT = 'dvb:weight';
+        this.SUGGESTED_PRESENTATION_DELAY = 'suggestedPresentationDelay';
+        this.SERVICE_DESCRIPTION = 'ServiceDescription';
+        this.SERVICE_DESCRIPTION_SCOPE = 'Scope';
+        this.SERVICE_DESCRIPTION_LATENCY = 'Latency';
+        this.SERVICE_DESCRIPTION_PLAYBACK_RATE = 'PlaybackRate';
     }
 
     constructor () {

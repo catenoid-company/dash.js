@@ -13,7 +13,8 @@ class VideoModelMock {
         this.tracks = [];
         this.source = null;
         this.element = new VideoElementMock();
-
+        this.height = 600;
+        this.width = 800;
         this.events = {};
     }
 
@@ -52,8 +53,57 @@ class VideoModelMock {
         }
     }
 
+    getPlaybackQuality() {
+        let element = this.element;
+        if (!element) { return null; }
+        let hasWebKit = ('webkitDroppedFrameCount' in element) && ('webkitDecodedFrameCount' in element);
+        let hasQuality = ('getVideoPlaybackQuality' in element);
+        let result = null;
+
+        if (hasQuality) {
+            result = element.getVideoPlaybackQuality();
+        }
+        else if (hasWebKit) {
+            result = {
+                droppedVideoFrames: element.webkitDroppedFrameCount,
+                totalVideoFrames: element.webkitDroppedFrameCount + element.webkitDecodedFrameCount,
+                creationTime: new Date()
+            };
+        }
+
+        return result;
+    }
+
+    getClientWidth() {
+        return this.width;
+    }
+
+    setClientWidth(newWidth) {
+        this.width = newWidth;
+    }
+
+    getClientHeight() {
+        return this.height;
+    }
+
+    getVideoWidth() {
+        return this.element.videoWidth;
+    }
+
+    getVideoHeight() {
+        return this.element.videoHeight;
+    }
+
+    getVideoRelativeOffsetTop() {
+        return 0;
+    }
+
+    getVideoRelativeOffsetLeft() {
+        return 0;
+    }
+
     getElement() {
-        return 'element';
+        return this.element;
     }
 
     play() {
@@ -101,13 +151,23 @@ class VideoModelMock {
         return this.tracks;
     }
 
-    getTextTrack(idx) {
-        return this.element.textTracks[idx];
+    getTextTrack(kind, label/*, lang, isTTML, isEmbedded*/) {
+        for (let i = 0; i < this.element.textTracks.length; i++) {
+
+            if (this.element.textTracks[i].kind === kind && (label ? this.element.textTracks[i].label == label : true)) {
+                return this.element.textTracks[i];
+            }
+        }
+        return null;
     }
 
 
     addTextTrack(kind, label, lang) {
         return this.element.addTextTrack(kind, label, lang);
+    }
+
+    getCurrentCue(textTrack) {
+        return this.element.getCurrentCue(textTrack);
     }
 
     getTTMLRenderingDiv() {

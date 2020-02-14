@@ -36,31 +36,35 @@ import EventBus from '../core/EventBus';
 import BoxParser from '../streaming/utils/BoxParser';
 import FactoryMaker from '../core/FactoryMaker';
 import Debug from '../core/Debug';
-import {HTTPRequest} from '../streaming/vo/metrics/HTTPRequest';
 import FragmentRequest from '../streaming/vo/FragmentRequest';
-import XHRLoader from '../streaming/XHRLoader';
+import HTTPLoader from '../streaming/net/HTTPLoader';
+import Errors from '../core/errors/Errors';
 
 function SegmentBaseLoader() {
 
     const context = this.context;
-    const log = Debug(context).getInstance().log;
     const eventBus = EventBus(context).getInstance();
 
     let instance,
+        logger,
         errHandler,
         boxParser,
         requestModifier,
-        metricsModel,
+        dashMetrics,
         mediaPlayerModel,
-        xhrLoader,
+        httpLoader,
         baseURLController;
+
+    function setup() {
+        logger = Debug(context).getInstance().getLogger(instance);
+    }
 
     function initialize() {
         boxParser = BoxParser(context).getInstance();
         requestModifier = RequestModifier(context).getInstance();
-        xhrLoader = XHRLoader(context).create({
+        httpLoader = HTTPLoader(context).create({
             errHandler: errHandler,
-            metricsModel: metricsModel,
+            dashMetrics: dashMetrics,
             mediaPlayerModel: mediaPlayerModel,
             requestModifier: requestModifier
         });
@@ -71,8 +75,8 @@ function SegmentBaseLoader() {
             baseURLController = config.baseURLController;
         }
 
-        if (config.metricsModel) {
-            metricsModel = config.metricsModel;
+        if (config.dashMetrics) {
+            dashMetrics = config.dashMetrics;
         }
 
         if (config.mediaPlayerModel) {
@@ -84,17 +88,16 @@ function SegmentBaseLoader() {
         }
     }
 
-    function checkSetConfigCall() {
+    function checkConfig() {
         if (!baseURLController || !baseURLController.hasOwnProperty('resolve')) {
             throw new Error('setConfig function has to be called previously');
         }
     }
 
     function loadInitialization(representation, loadingInfo) {
-        checkSetConfigCall();
+        checkConfig();
         let initRange = null;
-        let isoFile = null;
-        const baseUrl = baseURLController.resolve(representation.path);
+        const baseUrl = representation ? baseURLController.resolve(representation.path) : null;
         const info = loadingInfo || {
             init: true,
             url: baseUrl ? baseUrl.url : undefined,
@@ -104,17 +107,17 @@ function SegmentBaseLoader() {
             },
             searching: false,
             bytesLoaded: 0,
-            bytesToLoad: 1500
+            bytesToLoad: 1500,
+            mediaType: representation && representation.adaptation ? representation.adaptation.type : null
         };
 
-        log('Start searching for initialization.');
+        logger.debug('Start searching for initialization.');
 
         const request = getFragmentRequest(info);
 
         const onload = function (response) {
             info.bytesLoaded = info.range.end;
-            isoFile = boxParser.parse(response);
-            initRange = findInitRange(isoFile);
+            initRange = boxParser.findInitRange(response);
 
             if (initRange) {
                 representation.range = initRange;
@@ -125,20 +128,19 @@ function SegmentBaseLoader() {
                 info.range.end = info.bytesLoaded + info.bytesToLoad;
                 loadInitialization(representation, info);
             }
-
         };
 
         const onerror = function () {
             eventBus.trigger(Events.INITIALIZATION_LOADED, {representation: representation});
         };
 
-        xhrLoader.load({request: request, success: onload, error: onerror});
+        httpLoader.load({request: request, success: onload, error: onerror});
 
-        log('Perform init search: ' + info.url);
+        logger.debug('Perform init search: ' + info.url);
     }
 
     function loadSegments(representation, type, range, loadingInfo, callback) {
-        checkSetConfigCall();
+        checkConfig();
         if (range && (range.start === undefined || range.end === undefined)) {
             const parts = range ? range.toString().split('-') : null;
             range = parts ? {start: parseFloat(parts[0]), end: parseFloat(parts[1])} : null;
@@ -148,14 +150,15 @@ function SegmentBaseLoader() {
         let isoFile = null;
         let sidx = null;
         const hasRange = !!range;
-        const baseUrl = baseURLController.resolve(representation.path);
+        const baseUrl = representation ? baseURLController.resolve(representation.path) : null;
         const info = {
             init: false,
             url: baseUrl ? baseUrl.url : undefined,
             range: hasRange ? range : { start: 0, end: 1500 },
             searching: !hasRange,
             bytesLoaded: loadingInfo ? loadingInfo.bytesLoaded : 0,
-            bytesToLoad: 1500
+            bytesToLoad: 1500,
+            mediaType: representation && representation.adaptation ? representation.adaptation.type : null
         };
 
         const request = getFragmentRequest(info);
@@ -197,7 +200,7 @@ function SegmentBaseLoader() {
                 }
 
                 if (loadMultiSidx) {
-                    log('Initiate multiple SIDX load.');
+                    logger.debug('Initiate multiple SIDX load.');
                     info.range.end = info.range.start + sidx.size;
 
                     let j, len, ss, se, r;
@@ -210,6 +213,10 @@ function SegmentBaseLoader() {
                             count++;
 
                             if (count >= len) {
+                                // http requests can be processed in a wrong order, so, we have to reorder segments with an ascending start Time order
+                                segs.sort(function (a, b) {
+                                    return a.startTime - b.startTime < 0 ? -1 : 0;
+                                });
                                 callback(segs, representation, type);
                             }
                         } else {
@@ -226,7 +233,7 @@ function SegmentBaseLoader() {
                     }
 
                 } else {
-                    log('Parsing segments from SIDX.');
+                    logger.debug('Parsing segments from SIDX. representation ' + representation.id + ' for range : ' + info.range.start + ' - ' + info.range.end);
                     segments = getSegmentsForSidx(sidx, info);
                     callback(segments, representation, type);
                 }
@@ -237,13 +244,13 @@ function SegmentBaseLoader() {
             callback(null, representation, type);
         };
 
-        xhrLoader.load({request: request, success: onload, error: onerror});
-        log('Perform SIDX load: ' + info.url);
+        httpLoader.load({request: request, success: onload, error: onerror});
+        logger.debug('Perform SIDX load: ' + info.url + ' with range : ' + info.range.start + ' - ' + info.range.end);
     }
 
     function reset() {
-        xhrLoader.abort();
-        xhrLoader = null;
+        httpLoader.abort();
+        httpLoader = null;
         errHandler = null;
         boxParser = null;
         requestModifier = null;
@@ -281,37 +288,12 @@ function SegmentBaseLoader() {
         return segments;
     }
 
-    function findInitRange(isoFile) {
-        const ftyp = isoFile.getBox('ftyp');
-        const moov = isoFile.getBox('moov');
-
-        let initRange = null;
-        let start,
-            end;
-
-        log('Searching for initialization.');
-
-        if (moov && moov.isComplete) {
-            start = ftyp ? ftyp.offset : moov.offset;
-            end = moov.offset + moov.size - 1;
-            initRange = start + '-' + end;
-
-            log('Found the initialization.  Range: ' + initRange);
-        }
-
-        return initRange;
-    }
-
     function getFragmentRequest(info) {
         if (!info.url) {
             return;
         }
-
         const request = new FragmentRequest();
-        request.type = info.init ? HTTPRequest.INIT_SEGMENT_TYPE : HTTPRequest.MEDIA_SEGMENT_TYPE;
-        request.url = info.url;
-        request.range = info.range.start + '-' + info.range.end;
-
+        request.setInfo(info);
         return request;
     }
 
@@ -319,7 +301,7 @@ function SegmentBaseLoader() {
         if (segments) {
             eventBus.trigger(Events.SEGMENTS_LOADED, {segments: segments, representation: representation, mediaType: type});
         } else {
-            eventBus.trigger(Events.SEGMENTS_LOADED, {segments: null, representation: representation, mediaType: type, error: new DashJSError(null, 'error loading segments', null)});
+            eventBus.trigger(Events.SEGMENTS_LOADED, {segments: null, representation: representation, mediaType: type, error: new DashJSError(Errors.SEGMENT_BASE_LOADER_ERROR_CODE, Errors.SEGMENT_BASE_LOADER_ERROR_MESSAGE)});
         }
     }
 
@@ -330,6 +312,8 @@ function SegmentBaseLoader() {
         loadSegments: loadSegments,
         reset: reset
     };
+
+    setup();
 
     return instance;
 }

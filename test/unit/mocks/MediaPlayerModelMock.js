@@ -35,23 +35,11 @@ from '../../../src/streaming/vo/metrics/HTTPRequest';
 
 const DEFAULT_UTC_TIMING_SOURCE = {
     scheme: 'urn:mpeg:dash:utc:http-xsdate:2014',
-    value: 'http://time.akamai.com/?iso'
+    value: 'http://time.akamai.com/?iso&ms'
 };
-const LIVE_DELAY_FRAGMENT_COUNT = 4;
 
-const DEFAULT_LOCAL_STORAGE_BITRATE_EXPIRATION = 360000;
-const DEFAULT_LOCAL_STORAGE_MEDIA_SETTINGS_EXPIRATION = 360000;
-
-const BANDWIDTH_SAFETY_FACTOR = 0.9;
-const ABANDON_LOAD_TIMEOUT = 10000;
-
-const BUFFER_TO_KEEP = 30;
-const BUFFER_PRUNING_INTERVAL = 30;
 const DEFAULT_MIN_BUFFER_TIME = 12;
 const DEFAULT_MIN_BUFFER_TIME_FAST_SWITCH = 20;
-const BUFFER_TIME_AT_TOP_QUALITY = 30;
-const BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM = 60;
-const LONG_FORM_CONTENT_DURATION_THRESHOLD = 600;
 
 const FRAGMENT_RETRY_ATTEMPTS = 3;
 const FRAGMENT_RETRY_INTERVAL = 1000;
@@ -62,10 +50,9 @@ const MANIFEST_RETRY_INTERVAL = 500;
 const XLINK_RETRY_ATTEMPTS = 1;
 const XLINK_RETRY_INTERVAL = 500;
 
-//This value influences the startup time for live (in ms).
-const WALLCLOCK_TIME_UPDATE_INTERVAL = 50;
-
 const DEFAULT_XHR_WITH_CREDENTIALS = false;
+
+const MANIFEST_UPDATE_RETRY_INTERVAL = 100;
 
 class MediaPlayerModelMock {
 
@@ -74,48 +61,12 @@ class MediaPlayerModelMock {
         return DEFAULT_UTC_TIMING_SOURCE;
     }
 
-    static get LIVE_DELAY_FRAGMENT_COUNT() {
-        return LIVE_DELAY_FRAGMENT_COUNT;
-    }
-
-    static get DEFAULT_LOCAL_STORAGE_BITRATE_EXPIRATION() {
-        return DEFAULT_LOCAL_STORAGE_BITRATE_EXPIRATION;
-    }
-
-    static get DEFAULT_LOCAL_STORAGE_MEDIA_SETTINGS_EXPIRATION() {
-        return DEFAULT_LOCAL_STORAGE_MEDIA_SETTINGS_EXPIRATION;
-    }
-
-    static get BANDWIDTH_SAFETY_FACTOR() {
-        return BANDWIDTH_SAFETY_FACTOR;
-    }
-
-    static get BUFFER_TO_KEEP() {
-        return BUFFER_TO_KEEP;
-    }
-
-    static get BUFFER_PRUNING_INTERVAL() {
-        return BUFFER_PRUNING_INTERVAL;
-    }
-
     static get DEFAULT_MIN_BUFFER_TIME() {
         return DEFAULT_MIN_BUFFER_TIME;
     }
 
     static get DEFAULT_MIN_BUFFER_TIME_FAST_SWITCH() {
         return DEFAULT_MIN_BUFFER_TIME_FAST_SWITCH;
-    }
-
-    static get BUFFER_TIME_AT_TOP_QUALITY() {
-        return BUFFER_TIME_AT_TOP_QUALITY;
-    }
-
-    static get BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM() {
-        return BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM;
-    }
-
-    static get LONG_FORM_CONTENT_DURATION_THRESHOLD() {
-        return LONG_FORM_CONTENT_DURATION_THRESHOLD;
     }
 
     static get FRAGMENT_RETRY_ATTEMPTS() {
@@ -134,6 +85,10 @@ class MediaPlayerModelMock {
         return MANIFEST_RETRY_INTERVAL;
     }
 
+    static get MANIFEST_UPDATE_RETRY_INTERVAL() {
+        return MANIFEST_UPDATE_RETRY_INTERVAL;
+    }
+
     static get XLINK_RETRY_ATTEMPTS() {
         return XLINK_RETRY_ATTEMPTS;
     }
@@ -142,9 +97,6 @@ class MediaPlayerModelMock {
         return XLINK_RETRY_INTERVAL;
     }
 
-    static get WALLCLOCK_TIME_UPDATE_INTERVAL() {
-        return WALLCLOCK_TIME_UPDATE_INTERVAL;
-    }
     static get DEFAULT_XHR_WITH_CREDENTIALS() {
         return DEFAULT_XHR_WITH_CREDENTIALS;
     }
@@ -155,30 +107,9 @@ class MediaPlayerModelMock {
 
     setup() {
         this.UTCTimingSources = [];
-        this.useSuggestedPresentationDelay = false;
-        this.useManifestDateHeaderTimeSource = true;
-        this.scheduleWhilePaused = true;
-        this.useDefaultABRRules = true;
         this.fastSwitchEnabled = false;
-        this.lastBitrateCachingInfo = {
-            enabled: true,
-            ttl: DEFAULT_LOCAL_STORAGE_BITRATE_EXPIRATION
-        };
-        this.lastMediaSettingsCachingInfo = {
-            enabled: true,
-            ttl: DEFAULT_LOCAL_STORAGE_MEDIA_SETTINGS_EXPIRATION
-        };
-        this.liveDelayFragmentCount = LIVE_DELAY_FRAGMENT_COUNT;
-        this.liveDelay = undefined; // Explicitly state that default is undefined
-        this.bufferToKeep = BUFFER_TO_KEEP;
-        this.bufferPruningInterval = BUFFER_PRUNING_INTERVAL;
-        this.stableBufferTime = NaN;
-        this.bufferTimeAtTopQuality = BUFFER_TIME_AT_TOP_QUALITY;
-        this.bufferTimeAtTopQualityLongForm = BUFFER_TIME_AT_TOP_QUALITY_LONG_FORM;
-        this.longFormContentDurationThreshold = LONG_FORM_CONTENT_DURATION_THRESHOLD;
-        this.bandwidthSafetyFactor = BANDWIDTH_SAFETY_FACTOR;
-        this.abandonLoadTimeout = ABANDON_LOAD_TIMEOUT;
-        this.wallclockTimeUpdateInterval = WALLCLOCK_TIME_UPDATE_INTERVAL;
+        this.liveDelay = null; // Explicitly state that default is null
+        this.stableBufferTime = -1;
         this.xhrWithCredentials = {
             default: DEFAULT_XHR_WITH_CREDENTIALS
         };
@@ -194,16 +125,7 @@ class MediaPlayerModelMock {
     }
 
     //TODO Should we use Object.define to have setters/getters? makes more readable code on other side.
-
-    setUseDefaultABRRules(value) {
-        this.useDefaultABRRules = value;
-    }
-
-    getUseDefaultABRRules() {
-        return this.useDefaultABRRules;
-    }
-
-    findABRCustomRule(rulename) {
+    findABRCustomRuleIndex(rulename) {
         let i;
         for (i = 0; i < this.customABRRule.length; i++) {
             if (this.customABRRule[i].rulename === rulename) {
@@ -219,7 +141,7 @@ class MediaPlayerModelMock {
 
     addABRCustomRule(type, rulename, rule) {
 
-        let index = this.findABRCustomRule(rulename);
+        let index = this.findABRCustomRuleIndex(rulename);
         if (index === -1) {
             // add rule
             this.customABRRule.push({
@@ -235,205 +157,72 @@ class MediaPlayerModelMock {
     }
 
     removeABRCustomRule(rulename) {
-        let index = this.findABRCustomRule(rulename);
-        if (index !== -1) {
-            // remove rule
-            this.customABRRule.splice(index, 1);
+        if (rulename) {
+            let index = this.findABRCustomRuleIndex(rulename);
+            if (index !== -1) {
+                // remove rule
+                this.customABRRule.splice(index, 1);
+            }
+        } else {
+            //if no rulename is defined, remove all ABR custome rules
+            this.customABRRule = [];
         }
-    }
-
-    removeAllABRCustomRule() {
-        this.customABRRule = [];
-    }
-
-    setBandwidthSafetyFactor(value) {
-        this.bandwidthSafetyFactor = value;
-    }
-
-    getBandwidthSafetyFactor() {
-        return this.bandwidthSafetyFactor;
-    }
-
-    setAbandonLoadTimeout(value) {
-        this.abandonLoadTimeout = value;
-    }
-
-    getAbandonLoadTimeout() {
-        return this.abandonLoadTimeout;
-    }
-
-    setStableBufferTime(value) {
-        this.stableBufferTime = value;
     }
 
     getStableBufferTime() {
-        return !isNaN(this.stableBufferTime) ? this.stableBufferTime : this.fastSwitchEnabled ? DEFAULT_MIN_BUFFER_TIME_FAST_SWITCH : DEFAULT_MIN_BUFFER_TIME;
-    }
-
-    setBufferTimeAtTopQuality(value) {
-        this.bufferTimeAtTopQuality = value;
-    }
-
-    getBufferTimeAtTopQuality() {
-        return this.bufferTimeAtTopQuality;
-    }
-
-    setBufferTimeAtTopQualityLongForm(value) {
-        this.bufferTimeAtTopQualityLongForm = value;
-    }
-
-    getBufferTimeAtTopQualityLongForm() {
-        return this.bufferTimeAtTopQualityLongForm;
-    }
-
-    setLongFormContentDurationThreshold(value) {
-        this.longFormContentDurationThreshold = value;
-    }
-
-    getLongFormContentDurationThreshold() {
-        return this.longFormContentDurationThreshold;
-    }
-
-    setBufferToKeep(value) {
-        this.bufferToKeep = value;
-    }
-
-    getBufferToKeep() {
-        return this.bufferToKeep;
-    }
-
-    setLastBitrateCachingInfo(enable, ttl) {
-        this.lastBitrateCachingInfo.enabled = enable;
-        if (ttl !== undefined && !isNaN(ttl) && typeof (ttl) === 'number') {
-            this.lastBitrateCachingInfo.ttl = ttl;
-        }
-    }
-
-    getLastBitrateCachingInfo() {
-        return this.lastBitrateCachingInfo;
-    }
-
-    setLastMediaSettingsCachingInfo(enable, ttl) {
-        this.lastMediaSettingsCachingInfo.enabled = enable;
-        if (ttl !== undefined && !isNaN(ttl) && typeof (ttl) === 'number') {
-            this.lastMediaSettingsCachingInfo.ttl = ttl;
-        }
-    }
-
-    getLastMediaSettingsCachingInfo() {
-        return this.lastMediaSettingsCachingInfo;
-    }
-
-    setBufferPruningInterval(value) {
-        this.bufferPruningInterval = value;
-    }
-
-    getBufferPruningInterval() {
-        return this.bufferPruningInterval;
-    }
-
-    setFragmentRetryAttempts(value) {
-        this.retryAttempts[HTTPRequest.MEDIA_SEGMENT_TYPE] = value;
-    }
-
-    setManifestRetryAttempts(value) {
-        this.retryAttempts[HTTPRequest.MPD_TYPE] = value;
+        return this.stableBufferTime > -1 ? this.stableBufferTime : this.fastSwitchEnabled ? DEFAULT_MIN_BUFFER_TIME_FAST_SWITCH : DEFAULT_MIN_BUFFER_TIME;
     }
 
     setRetryAttemptsForType(type, value) {
         this.retryAttempts[type] = value;
     }
 
-    getFragmentRetryAttempts() {
-        return this.retryAttempts[HTTPRequest.MEDIA_SEGMENT_TYPE];
-    }
-
-    getManifestRetryAttempts() {
-        return this.retryAttempts[HTTPRequest.MPD_TYPE];
-    }
-
     getRetryAttemptsForType(type) {
         return this.retryAttempts[type];
-    }
-
-    setFragmentRetryInterval(value) {
-        this.retryIntervals[HTTPRequest.MEDIA_SEGMENT_TYPE] = value;
-    }
-
-    setManifestRetryInterval(value) {
-        this.retryIntervals[HTTPRequest.MPD_TYPE] = value;
     }
 
     setRetryIntervalForType(type, value) {
         this.retryIntervals[type] = value;
     }
 
-    getFragmentRetryInterval() {
-        return this.retryIntervals[HTTPRequest.MEDIA_SEGMENT_TYPE];
-    }
-
-    getManifestRetryInterval() {
-        return this.retryIntervals[HTTPRequest.MPD_TYPE];
-    }
-
-    getRetryIntervalForType(type) {
+    getRetryIntervalsForType(type) {
         return this.retryIntervals[type];
-    }
-
-    setWallclockTimeUpdateInterval(value) {
-        this.wallclockTimeUpdateInterval = value;
-    }
-
-    getWallclockTimeUpdateInterval() {
-        return this.wallclockTimeUpdateInterval;
-    }
-
-    setScheduleWhilePaused(value) {
-        this.scheduleWhilePaused = value;
-    }
-
-    getScheduleWhilePaused() {
-        return this.scheduleWhilePaused;
-    }
-
-    setLiveDelayFragmentCount(value) {
-        this.liveDelayFragmentCount = value;
-    }
-
-    setLiveDelay(value) {
-        this.liveDelay = value;
-    }
-
-    getLiveDelayFragmentCount() {
-        return this.liveDelayFragmentCount;
     }
 
     getLiveDelay() {
         return this.liveDelay;
     }
 
-    setUseManifestDateHeaderTimeSource(value) {
-        this.useManifestDateHeaderTimeSource = value;
-    }
-
-    getUseManifestDateHeaderTimeSource() {
-        return this.useManifestDateHeaderTimeSource;
-    }
-
-    setUseSuggestedPresentationDelay(value) {
-        this.useSuggestedPresentationDelay = value;
-    }
-
-    getUseSuggestedPresentationDelay() {
-        return this.useSuggestedPresentationDelay;
-    }
-
     setUTCTimingSources(value) {
         this.UTCTimingSources = value;
     }
 
+    addUTCTimingSource(schemeIdUri, value) {
+        this.removeUTCTimingSource(schemeIdUri, value); //check if it already exists and remove if so.
+        let vo = {};
+        vo.schemeIdUri = schemeIdUri;
+        vo.value = value;
+        this.UTCTimingSources.push(vo);
+    }
+
     getUTCTimingSources() {
         return this.UTCTimingSources;
+    }
+
+    removeUTCTimingSource(schemeIdUri, value) {
+        for (let i = 0; i < this.UTCTimingSources.length; i++) {
+            if (this.UTCTimingSources[i].schemeIdUri === schemeIdUri && this.UTCTimingSources[i].value === value) {
+                this.UTCTimingSources.splice(i, 1);
+            }
+        }
+    }
+
+    clearDefaultUTCTimingSources() {
+        this.UTCTimingSources = [];
+    }
+
+    restoreDefaultUTCTimingSources() {
+        this.addUTCTimingSource(DEFAULT_UTC_TIMING_SOURCE.scheme, DEFAULT_UTC_TIMING_SOURCE.value);
     }
 
     setXHRWithCredentialsForType(type, value) {
@@ -454,15 +243,6 @@ class MediaPlayerModelMock {
         }
 
         return useCreds;
-    }
-
-
-    getFastSwitchEnabled() {
-        return this.fastSwitchEnabled;
-    }
-
-    setFastSwitchEnabled(value) {
-        this.fastSwitchEnabled = value;
     }
 
     reset() {

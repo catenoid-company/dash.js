@@ -4,9 +4,18 @@ import {
     replaceTokenForTemplate
 } from '../../src/dash/utils/SegmentsUtils';
 
+// import VoHelper from './helpers/VOHelper';
+// import ObjectsHelper from './helpers/ObjectsHelper';
+
 const expect = require('chai').expect;
 
 describe('SegmentUtils', function () {
+    // const testType = 'fragmentedText';
+    // const voHelper = new VoHelper();
+    // t objectsHelper = new ObjectsHelper();
+    // const timelineConverter = objectsHelper.getDummyTimelineConverter();
+    // const representation = voHelper.getDummyRepresentation(testType);
+
     describe('unescapeDollarsInTemplate', function () {
         it('should return undefined when unescapeDollarsInTemplate is called with an undefined url', function () {
             const result = unescapeDollarsInTemplate();

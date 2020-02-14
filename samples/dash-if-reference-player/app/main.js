@@ -1,13 +1,12 @@
 'use strict';
 
-var app = angular.module('DashPlayer', ['DashSourcesService', 'DashContributorsService', 'DashIFTestVectorsService', 'angular-flot']);
+var app = angular.module('DashPlayer', ['DashSourcesService', 'DashContributorsService', 'DashIFTestVectorsService', 'angular-flot']); /* jshint ignore:line */
 
 $(document).ready(function () {
     $('[data-toggle="tooltip"]').tooltip();
-    $('#drmLicenseForm').hide();
 });
 
-angular.module('DashSourcesService', ['ngResource']).factory('sources', function ($resource) {
+angular.module('DashSourcesService', ['ngResource']).factory('sources', function ($resource) { /* jshint ignore:line */
     return $resource('app/sources.json', {}, {
         query: {
             method: 'GET',
@@ -16,7 +15,7 @@ angular.module('DashSourcesService', ['ngResource']).factory('sources', function
     });
 });
 
-angular.module('DashContributorsService', ['ngResource']).factory('contributors', function ($resource) {
+angular.module('DashContributorsService', ['ngResource']).factory('contributors', function ($resource) { /* jshint ignore:line */
     return $resource('app/contributors.json', {}, {
         query: {
             method: 'GET',
@@ -25,7 +24,7 @@ angular.module('DashContributorsService', ['ngResource']).factory('contributors'
     });
 });
 
-angular.module('DashIFTestVectorsService', ['ngResource']).factory('dashifTestVectors', function ($resource) {
+angular.module('DashIFTestVectorsService', ['ngResource']).factory('dashifTestVectors', function ($resource) { /* jshint ignore:line */
     return $resource('https://testassets.dashif.org/dashjs.json', {}, {
         query: {
             method: 'GET',
@@ -35,15 +34,14 @@ angular.module('DashIFTestVectorsService', ['ngResource']).factory('dashifTestVe
 });
 
 app.controller('DashController', function ($scope, sources, contributors, dashifTestVectors) {
-
     $scope.selectedItem = {
-        url: "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd"
+        url: 'https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd'
     };
 
     sources.query(function (data) {
         $scope.availableStreams = data.items;
-        //if no mss package, remove mss samples.
-        let MssHandler = dashjs.MssHandler; /* jshint ignore:line */
+        // if no mss package, remove mss samples.
+        var MssHandler = dashjs.MssHandler; /* jshint ignore:line */
         if (typeof MssHandler !== 'function') {
             for (var i = $scope.availableStreams.length - 1; i >= 0; i--) {
                 if ($scope.availableStreams[i].name === 'Smooth Streaming') {
@@ -54,7 +52,7 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
 
         // DASH Industry Forum Test Vectors
         dashifTestVectors.query(function(data) {
-            $scope.availableStreams.splice(6, 0, {
+            $scope.availableStreams.splice(7, 0, {
                 name: 'DASH Industry Forum Test Vectors',
                 submenu: data.items
             });
@@ -132,7 +130,8 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
             ratio:          {data: [], selected: false, color: '#329d61', label: 'Audio Ratio'},
             download:       {data: [], selected: false, color: '#44c248', label: 'Audio Download Rate (Mbps)'},
             latency:        {data: [], selected: false, color: '#326e88', label: 'Audio Latency (ms)'},
-            droppedFPS:     {data: [], selected: false, color: '#004E64', label: 'Audio Dropped FPS'}
+            droppedFPS:     {data: [], selected: false, color: '#004E64', label: 'Audio Dropped FPS'},
+            liveLatency:     {data: [], selected: false, color: '#65080c', label: 'Live Latency'}
         },
         video:{
             buffer:         {data: [], selected: true, color: '#00589d', label: 'Video Buffer Level'},
@@ -142,7 +141,8 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
             ratio:          {data: [], selected: false, color: '#00CCBE', label: 'Video Ratio'},
             download:       {data: [], selected: false, color: '#FF6700', label: 'Video Download Rate (Mbps)'},
             latency:        {data: [], selected: false, color: '#329d61', label: 'Video Latency (ms)'},
-            droppedFPS:     {data: [], selected: false, color: '#65080c', label: 'Video Dropped FPS'}
+            droppedFPS:     {data: [], selected: false, color: '#65080c', label: 'Video Dropped FPS'},
+            liveLatency:     {data: [], selected: false, color: '#65080c', label: 'Live Latency'}
         }
     };
 
@@ -158,16 +158,19 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
         audio: null,
         video: null,
         text: null,
-        textEnabled: true
+        textEnabled: true,
+        forceTextStreaming: false
     };
     $scope.mediaSettingsCacheEnabled = true;
     $scope.metricsTimer = null;
     $scope.updateMetricsInterval = 1000;
     $scope.drmKeySystems = ['com.widevine.alpha', 'com.microsoft.playready'];
-    $scope.drmKeySystem = "";
-    $scope.drmLicenseURL = "";
+    $scope.drmKeySystem = '';
+    $scope.drmLicenseURL = '';
 
-    //metrics
+    $scope.isDynamic = false;
+
+    // metrics
     $scope.videoBitrate = 0;
     $scope.videoIndex = 0;
     $scope.videoPendingIndex = 0;
@@ -175,316 +178,226 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
     $scope.videoBufferLength = 0;
     $scope.videoDroppedFrames = 0;
     $scope.videoLatencyCount = 0;
-    $scope.videoLatency = "";
+    $scope.videoLatency = '';
     $scope.videoDownloadCount = 0;
-    $scope.videoDownload = "";
+    $scope.videoDownload = '';
     $scope.videoRatioCount = 0;
-    $scope.videoRatio = "";
+    $scope.videoRatio = '';
+    $scope.videoLiveLatency = 0;
 
     $scope.audioBitrate = 0;
     $scope.audioIndex = 0;
-    $scope.audioPendingIndex = "";
+    $scope.audioPendingIndex = '';
     $scope.audioMaxIndex = 0;
     $scope.audioBufferLength = 0;
     $scope.audioDroppedFrames = 0;
     $scope.audioLatencyCount = 0;
-    $scope.audioLatency = "";
+    $scope.audioLatency = '';
     $scope.audioDownloadCount = 0;
-    $scope.audioDownload = "";
+    $scope.audioDownload = '';
     $scope.audioRatioCount = 0;
-    $scope.audioRatio = "";
+    $scope.audioRatio = '';
+    $scope.audioLiveLatency = 0;
 
-
-    //Starting Options
+    // Starting Options
     $scope.autoPlaySelected = true;
     $scope.loopSelected = true;
     $scope.scheduleWhilePausedSelected = true;
     $scope.localStorageSelected = true;
+    $scope.jumpGapsSelected = true;
     $scope.fastSwitchSelected = true;
-    $scope.ABRStrategy = "abrDynamic";
+    $scope.videoAutoSwitchSelected = true;
+    $scope.videoQualities = [];
+    $scope.ABRStrategy = 'abrDynamic';
+
+    // Persistent license
+    $scope.persistentSessionId = {};
+    $scope.selectedKeySystem = null;
+
+    // Error management
+    $scope.error = '';
+    $scope.errorType = '';
+
     ////////////////////////////////////////
     //
     // Player Setup
     //
     ////////////////////////////////////////
 
-    $scope.video = document.querySelector(".dash-video-player video");
-    $scope.player = dashjs.MediaPlayer().create();
+    $scope.video = document.querySelector('.dash-video-player video');
+    // store a ref in window.player to provide an easy way to play with dash.js API
+    window.player = $scope.player = dashjs.MediaPlayer().create(); /* jshint ignore:line */
+
+    ////////////////////////////////////////
+    //
+    // Configuration file
+    //
+    ////////////////////////////////////////
+    let reqConfig = new XMLHttpRequest();
+    reqConfig.onload = function() {
+        if (reqConfig.status === 200) {
+            let config = JSON.parse(reqConfig.responseText);
+            if ($scope.player) {
+                $scope.player.updateSettings(config);
+            }
+        } else {
+            // Set default initial configuration
+            var initialConfig = {
+                'debug': {
+                    'logLevel': dashjs.Debug.LOG_LEVEL_INFO
+                },
+                'streaming': {
+                    'fastSwitchEnabled': $scope.fastSwitchSelected,
+                    'jumpGaps': true,
+                    'abr': {
+                        'autoSwitchBitrate': {
+                            'video': $scope.videoAutoSwitchSelected
+                        }
+                    }
+                }
+            }
+            $scope.player.updateSettings(initialConfig);
+        }
+    };
+
+    reqConfig.open("GET", "dashjs_config.json", true);
+    reqConfig.setRequestHeader("Content-type", "application/json");
+    reqConfig.send();
+
+    $scope.player.on(dashjs.MediaPlayer.events.ERROR, function (e) { /* jshint ignore:line */
+        if (!e.event) {
+            $scope.$apply(function () {
+                $scope.error = e.error.message;
+                $scope.errorType = 'Dash.js :' + e.error.code;
+                switch (e.error.code) {
+                    case dashjs.MediaPlayer.errors.MANIFEST_LOADER_PARSING_FAILURE_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.MANIFEST_LOADER_LOADING_FAILURE_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.XLINK_LOADER_LOADING_FAILURE_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.SEGMENTS_UPDATE_FAILED_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.SEGMENTS_UNAVAILABLE_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.SEGMENT_BASE_LOADER_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.TIME_SYNC_FAILED_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.FRAGMENT_LOADER_LOADING_FAILURE_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.FRAGMENT_LOADER_NULL_REQUEST_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.URL_RESOLUTION_FAILED_GENERIC_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.APPEND_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.REMOVE_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.DATA_UPDATE_FAILED_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.CAPABILITY_MEDIASOURCE_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.CAPABILITY_MEDIAKEYS_ERROR_CODE:
+                    case dashjs.MediaPlayer.errors.DOWNLOAD_ERROR_ID_SIDX:
+                    case dashjs.MediaPlayer.errors.MANIFEST_ERROR_ID_CODEC:
+                    case dashjs.MediaPlayer.errors.MANIFEST_ERROR_ID_PARSE:
+                    case dashjs.MediaPlayer.errors.MANIFEST_ERROR_ID_NOSTREAMS:
+                    case dashjs.MediaPlayer.errors.TIMED_TEXT_ERROR_ID_PARSE:
+                    // mss errors
+                    case dashjs.MediaPlayer.errors.MSS_NO_TFRF_CODE:
+                    // protection errors
+                    case dashjs.MediaPlayer.errors.MEDIA_KEYERR_CODE:
+                    case dashjs.MediaPlayer.errors.MEDIA_KEYERR_UNKNOWN_CODE:
+                    case dashjs.MediaPlayer.errors.MEDIA_KEYERR_CLIENT_CODE:
+                    case dashjs.MediaPlayer.errors.MEDIA_KEYERR_SERVICE_CODE:
+                    case dashjs.MediaPlayer.errors.MEDIA_KEYERR_OUTPUT_CODE:
+                    case dashjs.MediaPlayer.errors.MEDIA_KEYERR_HARDWARECHANGE_CODE:
+                    case dashjs.MediaPlayer.errors.MEDIA_KEYERR_DOMAIN_CODE:
+                        break;
+                }
+            });
+            $("#errorModal").modal('show');
+        }
+    }, $scope);
+
 
     $scope.player.initialize($scope.video, null, $scope.autoPlaySelected);
-    $scope.player.setFastSwitchEnabled(true);
-    $scope.player.attachVideoContainer(document.getElementById("videoContainer"));
+
     // Add HTML-rendered TTML subtitles except for Firefox < v49 (issue #1164)
     if (doesTimeMarchesOn()) {
-        $scope.player.attachTTMLRenderingDiv($("#video-caption")[0]);
+        $scope.player.attachTTMLRenderingDiv($('#video-caption')[0]);
     }
 
     // get buffer default value
-    $scope.defaultLiveDelay = $scope.player.getLiveDelay();
-    $scope.defaultStableBufferDelay = $scope.player.getStableBufferTime();
-    $scope.defaultBufferTimeAtTopQuality = $scope.player.getBufferTimeAtTopQuality();
-    $scope.defaultBufferTimeAtTopQualityLongForm = $scope.player.getBufferTimeAtTopQualityLongForm();
+    var currentConfig = $scope.player.getSettings();
+    $scope.defaultLiveDelay = currentConfig.streaming.liveDelay;
+    $scope.defaultStableBufferDelay = currentConfig.streaming.stableBufferTime;
+    $scope.defaultBufferTimeAtTopQuality = currentConfig.streaming.bufferTimeAtTopQuality;
+    $scope.defaultBufferTimeAtTopQualityLongForm = currentConfig.streaming.bufferTimeAtTopQualityLongForm;
+    $scope.lowLatencyModeSelected = currentConfig.streaming.lowLatencyEnabled;
 
-    $scope.controlbar = new ControlBar($scope.player);
+    var initVideoTrackSwitchMode = $scope.player.getTrackSwitchModeFor('video');
+    var initAudioTrackSwitchMode = $scope.player.getTrackSwitchModeFor('audio');
+
+    //get default track switch mode
+    if(initVideoTrackSwitchMode === 'alwaysReplace') {
+        document.getElementById('always-replace-video').checked = true;
+    } else {
+        document.getElementById('never-replace-video').checked = true;
+    }
+
+    if(initAudioTrackSwitchMode === 'alwaysReplace') {
+        document.getElementById('always-replace-audio').checked = true;
+    } else {
+        document.getElementById('never-replace-audio').checked = true;
+    }
+
+    $scope.controlbar = new ControlBar($scope.player); /* jshint ignore:line */
     $scope.controlbar.initialize();
     $scope.controlbar.disable();
     $scope.version = $scope.player.getVersion();
 
-    $scope.player.on(dashjs.MediaPlayer.events.ERROR, function (e) {
-        console.error(e.error + ' : ' + e.event.message);
+    $scope.player.on(dashjs.MediaPlayer.events.MANIFEST_LOADED, function (e) { /* jshint ignore:line */
+        $scope.isDynamic = e.data.type === 'dynamic';
     }, $scope);
 
-    $scope.player.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_REQUESTED, function (e) {
-        $scope[e.mediaType + "Index"] = e.oldQuality + 1;
-        $scope[e.mediaType + "PendingIndex"] = e.newQuality + 1;
-        $scope.plotPoint('pendingIndex', e.mediaType, e.newQuality + 1);
-
+    $scope.player.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_REQUESTED, function (e) { /* jshint ignore:line */
+        $scope[e.mediaType + 'Index'] = e.oldQuality + 1;
+        $scope[e.mediaType + 'PendingIndex'] = e.newQuality + 1;
+        $scope.plotPoint('pendingIndex', e.mediaType, e.newQuality + 1, getTimeForPlot());
+        $scope.safeApply();
     }, $scope);
 
-    $scope.player.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, function (e) {
-        $scope[e.mediaType + "Index"] = e.newQuality + 1;
-        $scope[e.mediaType + "PendingIndex"] = e.newQuality + 1;
-        $scope.plotPoint('index', e.mediaType, e.newQuality + 1);
+    $scope.player.on(dashjs.MediaPlayer.events.QUALITY_CHANGE_RENDERED, function (e) { /* jshint ignore:line */
+        $scope[e.mediaType + 'Index'] = e.newQuality + 1;
+        $scope.plotPoint('index', e.mediaType, e.newQuality + 1, getTimeForPlot());
+        $scope.safeApply();
     }, $scope);
 
-    $scope.player.on(dashjs.MediaPlayer.events.PERIOD_SWITCH_COMPLETED, function (e) {
+    $scope.player.on(dashjs.MediaPlayer.events.PERIOD_SWITCH_COMPLETED, function (e) { /* jshint ignore:line */
         $scope.streamInfo = e.toStreamInfo;
     }, $scope);
 
-    $scope.player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, function (e) {
-        clearInterval($scope.metricsTimer);
+    $scope.player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, function (e) { /* jshint ignore:line */
+        stopMetricsInterval();
+
+        $scope.videoQualities = $scope.player.getBitrateInfoListFor('video');
         $scope.chartCount = 0;
         $scope.metricsTimer = setInterval(function () {
-            updateMetrics("video");
-            updateMetrics("audio");
+            updateMetrics('video');
+            updateMetrics('audio');
             $scope.chartCount++;
-        }, $scope.updateMetricsInterval)
+        }, $scope.updateMetricsInterval);
     }, $scope);
 
-    $scope.player.on(dashjs.MediaPlayer.events.PLAYBACK_ENDED, function (e) {
+    $scope.player.on(dashjs.MediaPlayer.events.PLAYBACK_ENDED, function (e) { /* jshint ignore:line */
         if ($('#loop-cb').is(':checked') &&
             $scope.player.getActiveStream().getStreamInfo().isLast) {
             $scope.doLoad();
         }
     }, $scope);
 
-    ////////////////////////////////////////
-    //
-    // DRM Events  //TODO Implement what is in eme-main and eme-index into this $scope.player to unify.  Add dialog in tab section for DRM license info.  Reinstate the DRM Options panel
-    //
-    ////////////////////////////////////////
+    $scope.player.on(dashjs.MediaPlayer.events.KEY_SYSTEM_SELECTED, function (e) { /* jshint ignore:line */
+        if (e.data) {
+            $scope.selectedKeySystem = e.data.keySystem.systemString;
+        }
+    }, $scope);
 
-    // Listen for protection system creation/destruction by the $scope.player itself.  This will
-    // only happen in the case where we do not not provide a ProtectionController
-    // to the $scope.player via dashjs.MediaPlayer.attachSource()
-
-    //$scope.player.on(dashjs.MediaPlayer.events.PROTECTION_CREATED, function (e) {
-    //    var data = addDRMData(e.manifest, e.controller);
-    //    data.isPlaying = true;
-    //    for (var i = 0; i < $scope.drmData.length; i++) {
-    //        if ($scope.drmData[i] !== data) {
-    //            $scope.drmData[i].isPlaying = false;
-    //        }
-    //    }
-    //    $scope.safeApply();
-    //}, $scope);
-    //
-    //$scope.player.on(dashjs.MediaPlayer.events.PROTECTION_DESTROYED, function (e) {
-    //    for (var i = 0; i < $scope.drmData.length; i++) {
-    //        if ($scope.drmData[i].manifest.url === e.data) {
-    //            $scope.drmData.splice(i, 1);
-    //            break;
-    //        }
-    //    }
-    //    $scope.safeApply();
-    //}, $scope);
-
-
-    //var addDRMData = function(manifest, protCtrl) {
-    //
-    //    // Assign the session type to be used for this controller
-    //    protCtrl.setSessionType($("#session-type").find(".active").children().attr("id"));
-    //
-    //    var data = {
-    //        manifest: manifest,
-    //        protCtrl: protCtrl,
-    //        licenseReceived: false,
-    //        sessions: []
-    //    };
-    //    var findSession = function(sessionID) {
-    //        for (var i = 0; i < data.sessions.length; i++) {
-    //            if (data.sessions[i].sessionID === sessionID)
-    //                return data.sessions[i];
-    //        }
-    //        return null;
-    //    };
-    //    $scope.drmData.push(data);
-    //    $scope.safeApply();
-    //
-    //    $scope.player.on(dashjs.MediaPlayer.events.KEY_SYSTEM_SELECTED, function(e) {
-    //        if (!e.error) {
-    //            data.ksconfig = e.data.ksConfiguration;
-    //        } else {
-    //            data.error = e.error;
-    //        }
-    //        $scope.safeApply();
-    //    }, $scope);
-    //
-    //
-    //    $scope.player.on(dashjs.MediaPlayer.events.KEY_SESSION_CREATED, function(e) {
-    //        if (!e.error) {
-    //            var persistedSession = findSession(e.data.getSessionID());
-    //            if (persistedSession) {
-    //                persistedSession.isLoaded = true;
-    //                persistedSession.sessionToken = e.data;
-    //            } else {
-    //                var sessionToken = e.data;
-    //                data.sessions.push({
-    //                    sessionToken: sessionToken,
-    //                    sessionID: e.data.getSessionID(),
-    //                    isLoaded: true
-    //                });
-    //            }
-    //        } else {
-    //            data.error = e.error;
-    //        }
-    //        $scope.safeApply();
-    //    }, $scope);
-    //
-    //
-    //    $scope.player.on(dashjs.MediaPlayer.events.KEY_SESSION_REMOVED, function(e) {
-    //        if (!e.error) {
-    //            var session = findSession(e.data);
-    //            if (session) {
-    //                session.isLoaded = false;
-    //                session.sessionToken = null;
-    //            }
-    //        } else {
-    //            data.error = e.error;
-    //        }
-    //        $scope.safeApply();
-    //    }, $scope);
-    //
-    //
-    //    $scope.player.on(dashjs.MediaPlayer.events.KEY_SESSION_CLOSED, function(e) {
-    //        if (!e.error) {
-    //            for (var i = 0; i < data.sessions.length; i++) {
-    //                if (data.sessions[i].sessionID === e.data) {
-    //                    data.sessions.splice(i, 1);
-    //                    break;
-    //                }
-    //            }
-    //        } else {
-    //            data.error = e.error;
-    //        }
-    //        $scope.safeApply();
-    //    }, $scope);
-    //
-    //    $scope.player.on(dashjs.MediaPlayer.events.KEY_STATUSES_CHANGED, function(e) {
-    //        var session = findSession(e.data.getSessionID());
-    //        if (session) {
-    //            var toGUID = function(uakey) {
-    //                var keyIdx = 0, retVal = "", i, zeroPad = function(str) {
-    //                    return (str.length === 1) ? "0" + str : str;
-    //                };
-    //                for (i = 0; i < 4; i++, keyIdx++)
-    //                    retVal += zeroPad(uakey[keyIdx].toString(16));
-    //                retVal += "-";
-    //                for (i = 0; i < 2; i++, keyIdx++)
-    //                    retVal += zeroPad(uakey[keyIdx].toString(16));
-    //                retVal += "-";
-    //                for (i = 0; i < 2; i++, keyIdx++)
-    //                    retVal += zeroPad(uakey[keyIdx].toString(16));
-    //                retVal += "-";
-    //                for (i = 0; i < 2; i++, keyIdx++)
-    //                    retVal += zeroPad(uakey[keyIdx].toString(16));
-    //                retVal += "-";
-    //                for (i = 0; i < 6; i++, keyIdx++)
-    //                    retVal += zeroPad(uakey[keyIdx].toString(16));
-    //                return retVal;
-    //            };
-    //            session.keystatus = [];
-    //            e.data.getKeyStatuses().forEach(function(status, key){
-    //                session.keystatus.push({
-    //                    key: toGUID(new Uint8Array(key)),
-    //                    status: status
-    //                });
-    //            });
-    //            $scope.safeApply();
-    //        }
-    //    }, $scope);
-    //
-    //    $scope.player.on(dashjs.MediaPlayer.events.KEY_MESSAGE, function(e) {
-    //        var session = findSession(e.data.sessionToken.getSessionID());
-    //        if (session) {
-    //            session.lastMessage = "Last Message: " + e.data.message.byteLength + " bytes";
-    //            if (e.data.messageType) {
-    //                session.lastMessage += " (" + e.data.messageType + "). ";
-    //            } else {
-    //                session.lastMessage += ". ";
-    //            }
-    //            session.lastMessage += "Waiting for response from license server...";
-    //            $scope.safeApply();
-    //        }
-    //    }, $scope);
-    //
-    //    $scope.player.on(dashjs.MediaPlayer.events.LICENSE_REQUEST_COMPLETE, function(e) {
-    //        if (!e.error) {
-    //            var session = findSession(e.data.sessionToken.getSessionID());
-    //            if (session) {
-    //                session.lastMessage = "Successful response received from license server for message type '" + e.data.messageType + "'!";
-    //                data.licenseReceived = true;
-    //            }
-    //        } else {
-    //            data.error = "License request failed for message type '" + e.data.messageType + "'! " + e.error;
-    //        }
-    //        $scope.safeApply();
-    //    }, $scope);
-    //
-    //    return data;
-    //};
-    //
-    //$scope.delete = function(data) {
-    //    for (var i = 0; i < $scope.drmData.length; i++) {
-    //        if ($scope.drmData[i] === data) {
-    //            $scope.drmData.splice(i,1);
-    //            data.protCtrl.reset();
-    //            $scope.safeApply();
-    //        }
-    //    }
-    //};
-
-    //$scope.play = function (data) {
-    //    $scope.player.attachSource(data.manifest, data.protCtrl);
-    //    for (var i = 0; i < $scope.drmData.length; i++) {
-    //        var drmData = $scope.drmData[i];
-    //        drmData.isPlaying = !!(drmData === data);
-    //    }
-    //};
-
-    //$scope.doLicenseFetch = function () {
-    //    $scope.player.retrieveManifest($scope.selectedItem.url, function (manifest) {
-    //        if (manifest) {
-    //            var found = false;
-    //            for (var i = 0; i < $scope.drmData.length; i++) {
-    //                if (manifest.url === $scope.drmData[i].manifest.url) {
-    //                    found = true;
-    //                    break;
-    //                }
-    //            }
-    //            if (!found) {
-    //                var protCtrl = $scope.player.getProtectionController();
-    //                if ($scope.selectedItem.hasOwnProperty("protData")) {
-    //                    protCtrl.setProtectionData($scope.selectedItem.protData);
-    //                }
-    //                addDRMData(manifest, protCtrl);
-    //                protCtrl.initialize(manifest);
-    //            }
-    //        } else {
-    //            // Log error here
-    //        }
-    //    });
-    //};
+    $scope.player.on(dashjs.MediaPlayer.events.KEY_SESSION_CREATED, function (e) { /* jshint ignore:line */
+        if (e.data) {
+            var session = e.data;
+            if (session.getSessionType() === 'persistent-license') {
+                $scope.persistentSessionId[$scope.selectedItem.url] = session.getSessionID();
+            }
+        }
+    }, $scope);
 
     ////////////////////////////////////////
     //
@@ -494,7 +407,7 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
 
     $scope.onChartEnableButtonClick = function () {
         $scope.chartEnabled = !$scope.chartEnabled;
-        $('#chart-wrapper').fadeTo(500, $scope.chartEnabled ? 1 : .3);
+        $('#chart-wrapper').fadeTo(500, $scope.chartEnabled ? 1 : 0.3);
     };
 
     $scope.toggleAutoPlay = function () {
@@ -502,33 +415,88 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
     };
 
     $scope.changeABRStrategy = function (strategy) {
-        $scope.player.setABRStrategy(strategy);
+        $scope.player.updateSettings({
+            'streaming': {
+                'abr': {
+                    'ABRStrategy': strategy
+                }
+            }
+        });
     };
 
     $scope.toggleUseCustomABRRules = function () {
-        $scope.player.getThumbnail($scope.player.time());
+        $scope.player.updateSettings({
+            'streaming': {
+                'abr': {
+                    'useDefaultABRRules': !$scope.customABRRulesSelected
+                }
+            }
+        });
+
         if ($scope.customABRRulesSelected) {
-            $scope.player.useDefaultABRRules(false);
-            $scope.player.addABRCustomRule('qualitySwitchRules', 'DownloadRatioRule', DownloadRatioRule);
-            $scope.player.addABRCustomRule('qualitySwitchRules', 'ThroughputRule', CustomThroughputRule);
+            $scope.player.addABRCustomRule('qualitySwitchRules', 'DownloadRatioRule', DownloadRatioRule); /* jshint ignore:line */
+            $scope.player.addABRCustomRule('qualitySwitchRules', 'ThroughputRule', CustomThroughputRule); /* jshint ignore:line */
         } else {
-            $scope.player.useDefaultABRRules(true);
             $scope.player.removeABRCustomRule('DownloadRatioRule');
             $scope.player.removeABRCustomRule('ThroughputRule');
         }
     };
 
     $scope.toggleFastSwitch = function () {
-        $scope.player.setFastSwitchEnabled($scope.fastSwitchSelected);
+        $scope.player.updateSettings({
+            'streaming': {
+                'fastSwitchEnabled': $scope.fastSwitchSelected
+            }
+        });
+    };
+
+    $scope.toggleVideoAutoSwitch = function () {
+        $scope.player.updateSettings({
+            'streaming': {
+                'abr': {
+                    'autoSwitchBitrate': {
+                        'video': $scope.videoAutoSwitchSelected
+                    }
+                }
+            }
+        });
     };
 
     $scope.toggleScheduleWhilePaused = function () {
-        $scope.player.setScheduleWhilePaused($scope.scheduleWhilePausedSelected);
+        $scope.player.updateSettings({
+            'streaming': {
+                'scheduleWhilePaused': $scope.scheduleWhilePausedSelected
+            }
+        });
     };
 
     $scope.toggleLocalStorage = function () {
-        $scope.player.enableLastBitrateCaching($scope.localStorageSelected);
-        $scope.player.enableLastMediaSettingsCaching($scope.localStorageSelected);
+        $scope.player.updateSettings({
+            'streaming': {
+                'lastBitrateCachingInfo': {
+                    'enabled': $scope.localStorageSelected
+                },
+                'lastMediaSettingsCachingInfo': {
+                    'enabled': $scope.localStorageSelected
+                }
+            }
+        });
+    };
+
+    $scope.toggleJumpGaps = function () {
+        $scope.player.updateSettings({
+            'streaming': {
+                'jumpGaps': $scope.jumpGapsSelected
+            }
+        });
+    };
+
+    $scope.togglelowLatencyMode = function () {
+        $scope.player.updateSettings({
+            'streaming': {
+                'lowLatencyEnabled': $scope.lowLatencyModeSelected
+            }
+        });
     };
 
     $scope.setStream = function (item) {
@@ -539,14 +507,17 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
         $scope.optionsGutter = bool;
     };
 
-    $scope.doLoad = function () {
+    $scope.selectVideoQuality = function (quality) {
+        $scope.player.setQualityFor('video', quality);
+    };
 
+    $scope.doLoad = function () {
         $scope.initSession();
 
         var protData = {};
-        if ($scope.selectedItem.hasOwnProperty("protData")) {
+        if ($scope.selectedItem.hasOwnProperty('protData')) {
             protData = $scope.selectedItem.protData;
-        } else if ($scope.drmLicenseURL !== "" && $scope.drmKeySystem !== "") {
+        } else if ($scope.drmLicenseURL !== '' && $scope.drmKeySystem !== '') {
             protData[$scope.drmKeySystem] = {
                 serverURL: $scope.drmLicenseURL
             };
@@ -554,47 +525,90 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
             protData = null;
         }
 
-        var bufferConfig = {
-            liveDelay: $scope.defaultLiveDelay,
-            stableBufferTime: $scope.defaultStableBufferDelay,
-            bufferTimeAtTopQuality: $scope.defaultBufferTimeAtTopQuality,
-            bufferTimeAtTopQualityLongForm: $scope.defaultBufferTimeAtTopQualityLongForm
+        // Check if persistent license session ID is stored for current stream
+        var sessionId = $scope.persistentSessionId[$scope.selectedItem.url];
+        if (sessionId) {
+            if (!protData) {
+                protData = {};
+            }
+            if (!protData[$scope.selectedKeySystem]) {
+                protData[$scope.selectedKeySystem] = {};
+            }
+            protData[$scope.selectedKeySystem].sessionId = sessionId;
+        }
+
+        var config = {
+            'streaming': {
+                'liveDelay': $scope.defaultLiveDelay,
+                'stableBufferTime': $scope.defaultStableBufferDelay,
+                'bufferTimeAtTopQuality': $scope.defaultBufferTimeAtTopQuality,
+                'bufferTimeAtTopQualityLongForm': $scope.defaultBufferTimeAtTopQualityLongForm,
+                'lowLatencyEnabled': $scope.lowLatencyModeSelected
+            }
         };
-        if ($scope.selectedItem.hasOwnProperty("bufferConfig")) {
+
+        if ($scope.selectedItem.hasOwnProperty('bufferConfig')) {
             var selectedConfig = $scope.selectedItem.bufferConfig;
 
             if (selectedConfig.liveDelay) {
-                bufferConfig.liveDelay = selectedConfig.liveDelay;
+                config.streaming.liveDelay = selectedConfig.liveDelay;
             }
 
             if (selectedConfig.stableBufferTime) {
-                bufferConfig.stableBufferTime = selectedConfig.stableBufferTime;
+                config.streaming.stableBufferTime = selectedConfig.stableBufferTime;
             }
 
             if (selectedConfig.bufferTimeAtTopQuality) {
-                bufferConfig.bufferTimeAtTopQuality = selectedConfig.bufferTimeAtTopQuality;
+                config.streaming.bufferTimeAtTopQuality = selectedConfig.bufferTimeAtTopQuality;
             }
 
             if (selectedConfig.bufferTimeAtTopQualityLongForm) {
-                bufferConfig.bufferTimeAtTopQualityLongForm = selectedConfig.bufferTimeAtTopQualityLongForm;
+                config.streaming.bufferTimeAtTopQualityLongForm = selectedConfig.bufferTimeAtTopQualityLongForm;
+            }
+
+            if (selectedConfig.lowLatencyMode !== undefined) {
+                config.streaming.lowLatencyEnabled = selectedConfig.lowLatencyMode;
             }
         }
 
-        $scope.player.setLiveDelay(bufferConfig.liveDelay);
-        $scope.player.setStableBufferTime(bufferConfig.stableBufferTime);
-        $scope.player.setBufferTimeAtTopQuality(bufferConfig.bufferTimeAtTopQuality);
-        $scope.player.setBufferTimeAtTopQualityLongForm(bufferConfig.bufferTimeAtTopQualityLongForm);
+        const initBitrate = parseInt($scope.initialVideoBitrate);
+        if (!isNaN(initBitrate)) {
+            config.streaming.abr = {
+                'initialBitrate': {
+                    'video': initBitrate
+                }
+            }
+        }
+
+        const minBitrate = parseInt($scope.minVideoBitrate);
+        if (!isNaN(minBitrate)) {
+            config.streaming.abr = {
+                'minBitrate': {
+                    'video': minBitrate
+                }
+            }
+        }
+
+        const maxBitrate = parseInt($scope.maxVideoBitrate);
+        if (!isNaN(maxBitrate)) {
+            config.streaming.abr = {
+                'maxBitrate': {
+                    'video': maxBitrate
+                }
+            }
+        }        
+        $scope.player.updateSettings(config);
 
         $scope.controlbar.reset();
         $scope.player.setProtectionData(protData);
         $scope.player.attachSource($scope.selectedItem.url);
         if ($scope.initialSettings.audio) {
-            $scope.player.setInitialMediaSettingsFor("audio", {
+            $scope.player.setInitialMediaSettingsFor('audio', {
                 lang: $scope.initialSettings.audio
             });
         }
         if ($scope.initialSettings.video) {
-            $scope.player.setInitialMediaSettingsFor("video", {
+            $scope.player.setInitialMediaSettingsFor('video', {
                 role: $scope.initialSettings.video
             });
         }
@@ -602,28 +616,62 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
             $scope.player.setTextDefaultLanguage($scope.initialSettings.text);
         }
         $scope.player.setTextDefaultEnabled($scope.initialSettings.textEnabled);
+        $scope.player.enableForcedTextStreaming($scope.initialSettings.forceTextStreaming);
         $scope.controlbar.enable();
+    };
+
+    $scope.doStop = function () {
+        $scope.player.attachSource(null);
+        $scope.controlbar.reset();
+        stopMetricsInterval();
     };
 
     $scope.changeTrackSwitchMode = function (mode, type) {
         $scope.player.setTrackSwitchModeFor(type, mode);
     };
 
+    $scope.setLogLevel = function () {
+        var level = $("input[name='log-level']:checked").val();
+        switch(level) {
+            case 'none':
+            $scope.player.updateSettings({ 'debug': { 'logLevel': dashjs.Debug.LOG_LEVEL_NONE }});
+            break;
+
+            case 'fatal':
+            $scope.player.updateSettings({ 'debug': { 'logLevel': dashjs.Debug.LOG_LEVEL_FATAL }});
+            break;
+
+            case 'error':
+            $scope.player.updateSettings({ 'debug': { 'logLevel': dashjs.Debug.LOG_LEVEL_ERROR }});
+            break;
+
+            case 'warning':
+            $scope.player.updateSettings({ 'debug': { 'logLevel': dashjs.Debug.LOG_LEVEL_WARNING }});
+            break;
+
+            case 'info':
+            $scope.player.updateSettings({ 'debug': { 'logLevel': dashjs.Debug.LOG_LEVEL_INFO }});
+            break;
+
+            default:
+            $scope.player.updateSettings({ 'debug': { 'logLevel': dashjs.Debug.LOG_LEVEL_DEBUG }});
+        }
+    };
+
     $scope.hasLogo = function (item) {
-        return (item.hasOwnProperty("logo") && item.logo !== null && item.logo !== undefined && item.logo !== "");
+        return (item.hasOwnProperty('logo') && item.logo);
     };
 
     $scope.getChartButtonLabel = function () {
-        return $scope.chartEnabled ? "Disable" : "Enable";
+        return $scope.chartEnabled ? 'Disable' : 'Enable';
     };
 
     $scope.getOptionsButtonLabel = function () {
-        return $scope.optionsGutter ? "Hide Options" : "Show Options";
+        return $scope.optionsGutter ? 'Hide Options' : 'Show Options';
     };
 
     $scope.setDrmKeySystem = function (item) {
         $scope.drmKeySystem = item;
-        $('#drmLicenseForm').show();
     };
 
     // from: https://gist.github.com/siongui/4969449
@@ -646,17 +694,15 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
     };
 
     function calculateHTTPMetrics(type, requests) {
-
         var latency = {},
             download = {},
             ratio = {};
 
         var requestWindow = requests.slice(-20).filter(function (req) {
-            return req.responsecode >= 200 && req.responsecode < 300 && req.type === "MediaSegment" && req._stream === type && !!req._mediaduration;
+            return req.responsecode >= 200 && req.responsecode < 300 && req.type === 'MediaSegment' && req._stream === type && !!req._mediaduration;
         }).slice(-4);
 
         if (requestWindow.length > 0) {
-
             var latencyTimes = requestWindow.map(function (req) {
                 return Math.abs(req.tresponse.getTime() - req.trequest.getTime()) / 1000;
             });
@@ -726,27 +772,25 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
         }
     };
 
-    $scope.plotPoint = function (name, type, value) {
+    $scope.plotPoint = function (name, type, value, time) {
         if ($scope.chartEnabled) {
             var specificChart = $scope.chartState[type];
             if (specificChart) {
                 var data = specificChart[name].data;
-                data.push([$scope.video.currentTime, value]);
+                data.push([time, value]);
                 if (data.length > $scope.maxPointsToChart) {
                     data.splice(0, 1);
                 }
             }
         }
-        $scope.safeApply();
     };
 
     $scope.enableChartByName = function (id, type) {
-        //enable stat item
+        // enable stat item
         if ($scope.chartState[type][id].selected) {
-
-            //block stat item if too many already.
+            // block stat item if too many already.
             if ($scope.chartData.length === $scope.maxChartableItems) {
-                alert("You have selected too many items to chart simultaneously. Max allowd is " + $scope.maxChartableItems + ". Please unselect another item first, then reselected " + $scope.chartState[type][id].label);
+                alert('You have selected too many items to chart simultaneously. Max allowd is ' + $scope.maxChartableItems + '. Please unselect another item first, then reselected ' + $scope.chartState[type][id].label);
                 $scope.chartState[type][id].selected = false;
                 return;
             }
@@ -778,44 +822,66 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
         $scope.chartOptions.legend.noColumns = Math.min($scope.chartData.length, 5);
     };
 
+    function getTimeForPlot() {
+        var now = new Date().getTime() / 1000;
+        return Math.max(now - $scope.sessionStartTime, 0);
+    }
+
     function updateMetrics(type) {
-
-        var metrics = $scope.player.getMetricsFor(type);
         var dashMetrics = $scope.player.getDashMetrics();
+        var dashAdapter = $scope.player.getDashAdapter();
 
-        if (metrics && dashMetrics && $scope.streamInfo) {
-
+        if (dashMetrics && $scope.streamInfo) {
             var periodIdx = $scope.streamInfo.index;
-            var repSwitch = dashMetrics.getCurrentRepresentationSwitch(metrics);
-            var bufferLevel = dashMetrics.getCurrentBufferLevel(metrics);
-            var maxIndex = dashMetrics.getMaxIndexForBufferType(type, periodIdx);
+
+            var maxIndex = dashAdapter.getMaxIndexForBufferType(type, periodIdx);
+            var repSwitch = dashMetrics.getCurrentRepresentationSwitch(type, true);
+            var bufferLevel = dashMetrics.getCurrentBufferLevel(type, true);
             var index = $scope.player.getQualityFor(type);
-            var bitrate = repSwitch ? Math.round(dashMetrics.getBandwidthForRepresentation(repSwitch.to, periodIdx) / 1000) : NaN;
-            var droppedFPS = dashMetrics.getCurrentDroppedFrames(metrics) ? dashMetrics.getCurrentDroppedFrames(metrics).droppedFrames : 0;
 
-            $scope[type + "BufferLength"] = bufferLevel;
-            $scope[type + "MaxIndex"] = maxIndex;
-            $scope[type + "Bitrate"] = bitrate;
-            $scope[type + "DroppedFrames"] = droppedFPS;
+            var bitrate = repSwitch ? Math.round(dashAdapter.getBandwidthForRepresentation(repSwitch.to, periodIdx) / 1000) : NaN;
+            var droppedFramesMetrics = dashMetrics.getCurrentDroppedFrames();
+            var droppedFPS = droppedFramesMetrics ? droppedFramesMetrics.droppedFrames : 0;
+            var liveLatency = 0;
+            if ($scope.isDynamic) {
+                liveLatency = $scope.player.getCurrentLiveLatency();
+            }
 
-            var httpMetrics = calculateHTTPMetrics(type, dashMetrics.getHttpRequests(metrics));
+            $scope[type + 'BufferLength'] = bufferLevel;
+            $scope[type + 'MaxIndex'] = maxIndex;
+            $scope[type + 'Bitrate'] = bitrate;
+            $scope[type + 'DroppedFrames'] = droppedFPS;
+            $scope[type + 'LiveLatency'] = liveLatency;
+
+            var httpMetrics = calculateHTTPMetrics(type, dashMetrics.getHttpRequests(type));
             if (httpMetrics) {
-                $scope[type + "Download"] = httpMetrics.download[type].low.toFixed(2) + " | " + httpMetrics.download[type].average.toFixed(2) + " | " + httpMetrics.download[type].high.toFixed(2);
-                $scope[type + "Latency"] = httpMetrics.latency[type].low.toFixed(2) + " | " + httpMetrics.latency[type].average.toFixed(2) + " | " + httpMetrics.latency[type].high.toFixed(2);
-                $scope[type + "Ratio"] = httpMetrics.ratio[type].low.toFixed(2) + " | " + httpMetrics.ratio[type].average.toFixed(2) + " | " + httpMetrics.ratio[type].high.toFixed(2);
+                $scope[type + 'Download'] = httpMetrics.download[type].low.toFixed(2) + ' | ' + httpMetrics.download[type].average.toFixed(2) + ' | ' + httpMetrics.download[type].high.toFixed(2);
+                $scope[type + 'Latency'] = httpMetrics.latency[type].low.toFixed(2) + ' | ' + httpMetrics.latency[type].average.toFixed(2) + ' | ' + httpMetrics.latency[type].high.toFixed(2);
+                $scope[type + 'Ratio'] = httpMetrics.ratio[type].low.toFixed(2) + ' | ' + httpMetrics.ratio[type].average.toFixed(2) + ' | ' + httpMetrics.ratio[type].high.toFixed(2);
             }
 
             if ($scope.chartCount % 2 === 0) {
-                $scope.plotPoint('buffer', type, bufferLevel);
-                $scope.plotPoint('index', type, index);
-                $scope.plotPoint('bitrate', type, bitrate);
-                $scope.plotPoint('droppedFPS', type, droppedFPS);
+                var time = getTimeForPlot();
+                $scope.plotPoint('buffer', type, bufferLevel, time);
+                $scope.plotPoint('index', type, index, time);
+                $scope.plotPoint('bitrate', type, bitrate, time);
+                $scope.plotPoint('droppedFPS', type, droppedFPS, time);
+                $scope.plotPoint('liveLatency', type, liveLatency, time);
+
                 if (httpMetrics) {
-                    $scope.plotPoint('download', type, httpMetrics.download[type].average.toFixed(2));
-                    $scope.plotPoint('latency', type, httpMetrics.latency[type].average.toFixed(2));
-                    $scope.plotPoint('ratio', type, httpMetrics.ratio[type].average.toFixed(2));
+                    $scope.plotPoint('download', type, httpMetrics.download[type].average.toFixed(2), time);
+                    $scope.plotPoint('latency', type, httpMetrics.latency[type].average.toFixed(2), time);
+                    $scope.plotPoint('ratio', type, httpMetrics.ratio[type].average.toFixed(2), time);
                 }
+                $scope.safeApply();
             }
+        }
+    }
+
+    function stopMetricsInterval() {
+        if ($scope.metricsTimer) {
+            clearInterval($scope.metricsTimer);
+            $scope.metricsTimer = null;
         }
     }
 
@@ -855,14 +921,12 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
 
 
     (function init() {
-
-        $scope.initChartingByMediaType("video");
-        $scope.initChartingByMediaType("audio");
-
+        $scope.initChartingByMediaType('video');
+        $scope.initChartingByMediaType('audio');
 
         function getUrlVars() {
             var vars = {};
-            var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function (m, key, value) {
+            window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function (m, key, value) {
                 vars[key] = value;
             });
             return vars;
@@ -871,22 +935,35 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
         var vars = getUrlVars();
         var item = {};
 
-        if (vars && vars.hasOwnProperty("url")) {
+        if (vars && vars.hasOwnProperty('url')) {
             item.url = vars.url;
         }
 
-        if (vars && vars.hasOwnProperty("mpd")) {
+        if (vars && vars.hasOwnProperty('mpd')) {
             item.url = vars.mpd;
         }
 
-        if (vars && vars.hasOwnProperty("source")) {
+        if (vars && vars.hasOwnProperty('source')) {
             item.url = vars.source;
         }
 
-        if (vars && vars.hasOwnProperty("stream")) {
+        if (vars && vars.hasOwnProperty('stream')) {
             try {
                 item = JSON.parse(atob(vars.stream));
             } catch (e) {}
+        }
+
+
+        if (vars && vars.hasOwnProperty('targetLatency')) {
+            let targetLatency = parseInt(vars.targetLatency, 10);
+            if (!isNaN(targetLatency)) {
+                item.bufferConfig = {
+                    lowLatencyMode: true,
+                    liveDelay: targetLatency / 1000
+                };
+
+                $scope.lowLatencyModeSelected = true;
+            }
         }
 
         if (item.url) {
@@ -894,7 +971,7 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
 
             $scope.selectedItem = item;
 
-            if (vars.hasOwnProperty("autoplay")) {
+            if (vars.hasOwnProperty('autoplay')) {
                 startPlayback = (vars.autoplay === 'true');
             }
 
@@ -905,9 +982,9 @@ app.controller('DashController', function ($scope, sources, contributors, dashif
     })();
 });
 
-function legendLabelClickHandler(obj) {
-    var scope = angular.element($('body')).scope();
-    var id = obj.id.split(".");
+function legendLabelClickHandler(obj) { /* jshint ignore:line */
+    var scope = angular.element($('body')).scope(); /* jshint ignore:line */
+    var id = obj.id.split('.');
     var target = scope.chartState[id[0]][id[1]];
     target.selected = !target.selected;
     scope.enableChartByName(id[1], id[0]);

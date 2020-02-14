@@ -9,14 +9,13 @@ class ObjectsHelper {
         return {
             getType: () => type,
             getCurrentTrack: () => {},
-            getStreamInfo: () => { return { id: 'some_id', manifestInfo: {isDynamic: true} }; },
+            getStreamInfo: () => { return { id: 'DUMMY_STREAM-01', manifestInfo: {isDynamic: true} }; },
             getMediaInfo: () => { return { bitrateList: [
                                                 { bandwidth: 1000000 },
                                                 { bandwidth: 2000000 },
                                                 { bandwidth: 3000000 },
                                            ],
-                                           mimeType: "video/mp4" }},
-            getIndexHandler: () => this.getDummyIndexHandler()
+                                           mimeType: "video/mp4" }}
         };
     }
 
@@ -31,9 +30,21 @@ class ObjectsHelper {
     }
 
     getDummyTimelineConverter() {
+        let start = undefined;
+        let end = undefined;
+
         return {
+            initialize: () => {},
+            reset: () => {},
+            getClientTimeOffset: () => {},
             calcAvailabilityStartTimeFromPresentationTime: () => 0,
-            calcAvailabilityEndTimeFromPresentationTime: () => 0
+            calcAvailabilityEndTimeFromPresentationTime: () => 0,
+            calcPeriodRelativeTimeFromMpdRelativeTime: () => NaN,
+            calcMediaTimeFromPresentationTime: () => undefined,
+            calcSegmentAvailabilityRange: () =>  { return {start: start, end: end};},
+            isTimeSyncCompleted: () => {return true;},
+            setExpectedLiveEdge: () => {},
+            setRange: (range) => {start = range.start; end = range.end;}
         };
     }
 

@@ -52,10 +52,7 @@ function ThroughputHistory(config) {
     const EWMA_LATENCY_SLOW_HALF_LIFE_COUNT = 2;
     const EWMA_LATENCY_FAST_HALF_LIFE_COUNT = 1;
 
-    const CACHE_LOAD_THRESHOLD_VIDEO = 50;
-    const CACHE_LOAD_THRESHOLD_AUDIO = 5;
-
-    const mediaPlayerModel = config.mediaPlayerModel;
+    const settings = config.settings;
 
     let throughputDict,
         latencyDict,
@@ -74,9 +71,9 @@ function ThroughputHistory(config) {
 
     function isCachedResponse(mediaType, latencyMs, downloadTimeMs) {
         if (mediaType === Constants.VIDEO) {
-            return downloadTimeMs < CACHE_LOAD_THRESHOLD_VIDEO;
+            return downloadTimeMs < settings.get().streaming.cacheLoadThresholds[Constants.VIDEO];
         } else if (mediaType === Constants.AUDIO) {
-            return downloadTimeMs < CACHE_LOAD_THRESHOLD_AUDIO;
+            return downloadTimeMs < settings.get().streaming.cacheLoadThresholds[Constants.AUDIO];
         }
     }
 
@@ -88,8 +85,15 @@ function ThroughputHistory(config) {
         const latencyTimeInMilliseconds = (httpRequest.tresponse.getTime() - httpRequest.trequest.getTime()) || 1;
         const downloadTimeInMilliseconds = (httpRequest._tfinish.getTime() - httpRequest.tresponse.getTime()) || 1; //Make sure never 0 we divide by this value. Avoid infinity!
         const downloadBytes = httpRequest.trace.reduce((a, b) => a + b.b[0], 0);
-        const throughputMeasureTime = useDeadTimeLatency ? downloadTimeInMilliseconds : latencyTimeInMilliseconds + downloadTimeInMilliseconds;
-        let throughput = Math.round((8 * downloadBytes) / throughputMeasureTime); // bits/ms = kbits/s
+
+        let throughputMeasureTime;
+        if (settings.get().streaming.lowLatencyEnabled) {
+            throughputMeasureTime = httpRequest.trace.reduce((a, b) => a + b.d, 0);
+        } else {
+            throughputMeasureTime = useDeadTimeLatency ? downloadTimeInMilliseconds : latencyTimeInMilliseconds + downloadTimeInMilliseconds;
+        }
+
+        const throughput = Math.round((8 * downloadBytes) / throughputMeasureTime); // bits/ms = kbits/s
 
         checkSettingsForMediaType(mediaType);
 
@@ -137,8 +141,8 @@ function ThroughputHistory(config) {
     }
 
     function getSampleSize(isThroughput, mediaType, isLive) {
-        let arr;
-        let sampleSize;
+        let arr,
+            sampleSize;
 
         if (isThroughput) {
             arr = throughputDict[mediaType];
@@ -155,7 +159,7 @@ function ThroughputHistory(config) {
         } else if (isThroughput) {
             // if throughput samples vary a lot, average over a wider sample
             for (let i = 1; i < sampleSize; ++i) {
-                let ratio = arr[-i] / arr[-i - 1];
+                const ratio = arr[i] / arr[i - 1];
                 if (ratio >= THROUGHPUT_INCREASE_SCALE || ratio <= 1 / THROUGHPUT_DECREASE_SCALE) {
                     sampleSize += 1;
                     if (sampleSize === arr.length) { // cannot increase sampleSize beyond arr.length
@@ -170,13 +174,13 @@ function ThroughputHistory(config) {
 
     function getAverage(isThroughput, mediaType, isDynamic) {
         // only two moving average methods defined at the moment
-        return mediaPlayerModel.getMovingAverageMethod() !== Constants.MOVING_AVERAGE_SLIDING_WINDOW ?
+        return settings.get().streaming.abr.movingAverageMethod !== Constants.MOVING_AVERAGE_SLIDING_WINDOW ?
             getAverageEwma(isThroughput, mediaType) : getAverageSlidingWindow(isThroughput, mediaType, isDynamic);
     }
 
     function getAverageSlidingWindow(isThroughput, mediaType, isDynamic) {
-        let sampleSize = getSampleSize(isThroughput, mediaType, isDynamic);
-        let dict = isThroughput ? throughputDict : latencyDict;
+        const sampleSize = getSampleSize(isThroughput, mediaType, isDynamic);
+        const dict = isThroughput ? throughputDict : latencyDict;
         let arr = dict[mediaType];
 
         if (sampleSize === 0 || !arr || arr.length === 0) {
@@ -189,8 +193,8 @@ function ThroughputHistory(config) {
     }
 
     function getAverageEwma(isThroughput, mediaType) {
-        let halfLife = isThroughput ? ewmaHalfLife.throughputHalfLife : ewmaHalfLife.latencyHalfLife;
-        let ewmaObj = isThroughput ? ewmaThroughputDict[mediaType] : ewmaLatencyDict[mediaType];
+        const halfLife = isThroughput ? ewmaHalfLife.throughputHalfLife : ewmaHalfLife.latencyHalfLife;
+        const ewmaObj = isThroughput ? ewmaThroughputDict[mediaType] : ewmaLatencyDict[mediaType];
 
         if (!ewmaObj || ewmaObj.totalWeight <= 0) {
             return NaN;
@@ -209,7 +213,7 @@ function ThroughputHistory(config) {
     function getSafeAverageThroughput(mediaType, isDynamic) {
         let average = getAverageThroughput(mediaType, isDynamic);
         if (!isNaN(average)) {
-            average *= mediaPlayerModel.getBandwidthSafetyFactor();
+            average *= settings.get().streaming.abr.bandwidthSafetyFactor;
         }
         return average;
     }

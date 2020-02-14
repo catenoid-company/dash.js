@@ -29,7 +29,6 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 import Constants from '../constants/Constants';
-import {HTTPRequest} from '../vo/metrics/HTTPRequest';
 import DataChunk from '../vo/DataChunk';
 import FragmentModel from '../models/FragmentModel';
 import FragmentLoader from '../FragmentLoader';
@@ -43,31 +42,34 @@ function FragmentController( config ) {
 
     config = config || {};
     const context = this.context;
-    const log = Debug(context).getInstance().log;
     const eventBus = EventBus(context).getInstance();
 
     const errHandler = config.errHandler;
     const mediaPlayerModel = config.mediaPlayerModel;
-    const metricsModel = config.metricsModel;
+    const dashMetrics = config.dashMetrics;
 
     let instance,
+        logger,
         fragmentModels;
 
     function setup() {
+        logger = Debug(context).getInstance().getLogger(instance);
         resetInitialSettings();
         eventBus.on(Events.FRAGMENT_LOADING_COMPLETED, onFragmentLoadingCompleted, instance);
+        eventBus.on(Events.FRAGMENT_LOADING_PROGRESS, onFragmentLoadingCompleted, instance);
     }
 
     function getModel(type) {
         let model = fragmentModels[type];
         if (!model) {
             model = FragmentModel(context).create({
-                metricsModel: metricsModel,
+                dashMetrics: dashMetrics,
                 fragmentLoader: FragmentLoader(context).create({
-                    metricsModel: metricsModel,
+                    dashMetrics: dashMetrics,
                     mediaPlayerModel: mediaPlayerModel,
                     errHandler: errHandler,
-                    requestModifier: RequestModifier(context).getInstance()
+                    requestModifier: RequestModifier(context).getInstance(),
+                    settings: config.settings
                 })
             });
 
@@ -75,10 +77,6 @@ function FragmentController( config ) {
         }
 
         return model;
-    }
-
-    function isInitializationRequest(request) {
-        return (request && request.type && request.type === HTTPRequest.INIT_SEGMENT_TYPE);
     }
 
     function resetInitialSettings() {
@@ -90,10 +88,11 @@ function FragmentController( config ) {
 
     function reset() {
         eventBus.off(Events.FRAGMENT_LOADING_COMPLETED, onFragmentLoadingCompleted, this);
+        eventBus.off(Events.FRAGMENT_LOADING_PROGRESS, onFragmentLoadingCompleted, this);
         resetInitialSettings();
     }
 
-    function createDataChunk(bytes, request, streamId) {
+    function createDataChunk(bytes, request, streamId, endFragment) {
         const chunk = new DataChunk();
 
         chunk.streamId = streamId;
@@ -106,6 +105,7 @@ function FragmentController( config ) {
         chunk.index = request.index;
         chunk.quality = request.quality;
         chunk.representationId = request.representationId;
+        chunk.endFragment = endFragment;
 
         return chunk;
     }
@@ -117,22 +117,21 @@ function FragmentController( config ) {
 
         const request = e.request;
         const bytes = e.response;
-        const isInit = isInitializationRequest(request);
+        const isInit = request.isInitializationRequest();
         const streamInfo = request.mediaInfo.streamInfo;
 
-        if (e.error ) {
-            if (e.request.mediaType === Constants.AUDIO || e.request.mediaType === Constants.VIDEO) {
+        if (e.error) {
+            if (e.request.mediaType === Constants.AUDIO || e.request.mediaType === Constants.VIDEO || e.request.mediaType === Constants.FRAGMENTED_TEXT) {
                 // add service location to blacklist controller - only for audio or video. text should not set errors
                 eventBus.trigger(Events.SERVICE_LOCATION_BLACKLIST_ADD, {entry: e.request.serviceLocation});
             }
         }
 
         if (!bytes || !streamInfo) {
-            log('No ' + request.mediaType + ' bytes to push or stream is inactive.');
+            logger.warn('No ' + request.mediaType + ' bytes to push or stream is inactive.');
             return;
         }
-
-        const chunk = createDataChunk(bytes, request, streamInfo.id);
+        const chunk = createDataChunk(bytes, request, streamInfo.id, e.type !== Events.FRAGMENT_LOADING_PROGRESS);
         eventBus.trigger(isInit ? Events.INIT_FRAGMENT_LOADED : Events.MEDIA_FRAGMENT_LOADED, {
             chunk: chunk,
             fragmentModel: e.sender
@@ -141,7 +140,6 @@ function FragmentController( config ) {
 
     instance = {
         getModel: getModel,
-        isInitializationRequest: isInitializationRequest,
         reset: reset
     };
 

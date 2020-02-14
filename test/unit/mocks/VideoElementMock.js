@@ -4,6 +4,14 @@ class TextTrackMock {
         this.label = null;
         this.lang = null;
     }
+
+    addCue(cue) {
+        this.cue = cue;
+    }
+
+    getCurrentCue() {
+        return this.cue;
+    }
 }
 
 class VideoElementMock {
@@ -15,6 +23,9 @@ class VideoElementMock {
         this.currentTime = 0;
         this.duration = 0;
         this.textTracks = [];
+        this.nodeName = 'VIDEO';
+        this.videoWidth = 800;
+        this.videoHeight = 600;
     }
 
     constructor() {
@@ -29,6 +40,10 @@ class VideoElementMock {
         this.textTracks.push(textTrack);
 
         return textTrack;
+    }
+
+    getCurrentCue(textTrack) {
+        return textTrack.getCurrentCue();
     }
 
     reset() {

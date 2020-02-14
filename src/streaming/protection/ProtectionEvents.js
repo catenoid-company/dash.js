@@ -31,8 +31,7 @@
 import EventsBase from '../../core/events/EventsBase';
 /**
  * @class
- *
- */
+  */
 class ProtectionEvents extends EventsBase {
     /**
      * @description Public facing external events to be used when including protection package.
@@ -56,6 +55,12 @@ class ProtectionEvents extends EventsBase {
          * @ignore
          */
         this.INTERNAL_KEY_SYSTEM_SELECTED = 'internalKeySystemSelected';
+
+        /**
+         * Event ID for events delivered when the status of one decryption keys has changed
+         * @ignore
+         */
+        this.INTERNAL_KEY_STATUS_CHANGED = 'internalkeyStatusChanged';
 
         /**
          * Event ID for events delivered when a new key has been added
@@ -102,7 +107,6 @@ class ProtectionEvents extends EventsBase {
          */
         this.KEY_SESSION_REMOVED = 'public_keySessionRemoved';
 
-
         /**
          * Event ID for events delivered when the status of one or more
          * decryption keys has changed
@@ -115,7 +119,7 @@ class ProtectionEvents extends EventsBase {
          * has completed
          * @ignore
          */
-        this.KEY_SYSTEM_ACCESS_COMPLETE = 'keySystemAccessComplete';
+        this.KEY_SYSTEM_ACCESS_COMPLETE = 'public_keySystemAccessComplete';
 
         /**
          * Event ID for events delivered when a key system selection procedure

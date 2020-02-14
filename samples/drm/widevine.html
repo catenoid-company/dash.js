@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <title>Widevine DRM instantiation example</title>
+
+    <script src="../../dist/dash.all.debug.js"></script>
+    <!--dash.all.min.js should be used in production over dash.all.debug.js
+        Debug files are not compressed or obfuscated making the file size much larger compared with dash.all.min.js-->
+    <!--<script src="../../dist/dash.all.min.js"></script>-->
+
+    <script class="code">
+        function init() {
+            const protData = {
+                "com.widevine.alpha": {
+                    "serverURL": "https://license.pallycon.com/ri/licenseManager.do",
+                    "httpRequestHeaders": {
+                        "pallycon-customdata-v2": "eyJ0aW1lc3RhbXAiOiIyMDE5LTEwLTEwVDAwOjU3OjU3WiIsImhhc2giOiI4bkw5Sit1Sm1ENytIaFRaN1E1S2RzOGwra2E1NVwvNkRLdncwYnhQNmVzND0iLCJ0b2tlbiI6ImNtdml4MTdYZzhObXVrd3FxT25tZ1ZkNzB6c1JXcUo0KzRvV3ZuUnNjWExJVDdFQlhxWDZcL1FreHBHeldzXC9TRHh5SmFhbEl2SnF0QjJ0ajJXbmFSZDFZOXVXbjI0Mm1hYW1RT3JrZEhkd01HeW5oMzVJR1lTV1dMVlF3bFczWkFaeW5NZGhvSUpVUlV3VERPN2RyUGM4ZFpoQ1NnU1EyWkYxWmd0U3dqcW5uazkyTnpabmRYQ0dDcFhGMnFUZDlGZ29QTHdBckk3bENyUDMwQ1lJU2xYMGF4cG5aVTJtcUcyWGhIazBxejFGcDQrTjVFdFNUclk3Um5pSzdORlRtWmRPVGF6UVdPZDZhc2I4ZHlpR2xZZkVOWDNualdPeUtra2ZQcGN4VHljOWZcL1B5TTN0bzZcL0I5cGlNTm5CMUpzT2Zmallzd3BkVmU0Wk5cL2I0NGRTT1VNRjZQQTRPTk9wSFpWTXVGZUNvWnE2Qit3MmxGSitubWxlN09pdmVKV202K2JVTEZIRDVLSHJDeStuWlFlK3RZWVVqK0t2TklTVDJyMkk2Q24wZDdFMXRDWnFSUTFZQXh2Y0laK25CeGpSN2tJbDhrWHZ6Vjd5V0VmYU9IV2puYzBWXC9pN0NUNG9NbTgwM1Y2cFJlOUFLSWo5QXRsWU0rWE91NCtzT2tWcWhPV1JUV2ZIaDhnRUlPQ3ozZW5BZUpvS1dWd0JnaFNPZ25WbWtIQzRIaGsrY3V6ZENDTVRjdStPYVZvM1wvdU11QkYiLCJzaXRlX2lkIjoiN0hMNSIsImRybV90eXBlIjoiV2lkZXZpbmUiLCJ1c2VyX2lkIjoiTElDRU5TRVRPS0VOIiwiY2lkIjoiY2gxNDdfNzIwcCJ9"
+                    }
+                }
+            };
+            var video,
+                player,
+                url_drm = "https://skylife-tm-ch147.akamaized.net/live-01-ch147/ch147_720p/manifest.mpd",
+                url_nondrm = "https://skylife-tm-ch147.akamaized.net/live-01-ch147-nondrm/ch147_720p/manifest.mpd",
+                url_drmabr = "https://skylife-tm-ch147.akamaized.net/live-01-ch147/smil:ch147_test02.smil/manifest.mpd";
+
+            video = document.querySelector("video");
+            player = dashjs.MediaPlayer().create();
+            player.updateSettings({
+                    'debug': {
+                        'logLevel': dashjs.Debug.LOG_LEVEL_DEBUG
+                    }
+                }
+            );
+            player.initialize(video, url_drm, true);
+            player.setProtectionData(protData);
+        }
+    </script>
+
+    <style>
+        video {
+            width: 640px;
+            height: 360px;
+        }
+    </style>
+</head>
+<body>
+<div>
+    <video controls="true">
+    </video>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        init();
+    });
+</script>
+<script src="../highlighter.js"></script>
+</body>
+</html>
+
+

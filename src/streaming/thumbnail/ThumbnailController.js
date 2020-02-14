@@ -34,44 +34,70 @@ import Constants from '../constants/Constants';
 import Thumbnail from '../vo/Thumbnail';
 import ThumbnailTracks from './ThumbnailTracks';
 import BitrateInfo from '../vo/BitrateInfo';
-import {replaceTokenForTemplate, unescapeDollarsInTemplate} from '../../dash/utils/SegmentsUtils';
+import { replaceTokenForTemplate, unescapeDollarsInTemplate } from '../../dash/utils/SegmentsUtils';
 
 function ThumbnailController(config) {
 
     const context = this.context;
 
-    let instance;
-    let thumbnailTracks;
+    let instance,
+        thumbnailTracks;
 
     function setup() {
         reset();
         thumbnailTracks = ThumbnailTracks(context).create({
-            dashManifestModel: config.dashManifestModel,
             adapter: config.adapter,
             baseURLController: config.baseURLController,
-            stream: config.stream
+            stream: config.stream,
+            timelineConverter: config.timelineConverter
         });
     }
 
-    function getThumbnail(time) {
+    function getThumbnail(time, callback) {
         const track = thumbnailTracks.getCurrentTrack();
-        if (!track || track.segmentDuration <= 0) {
+        let offset,
+            request;
+        if (!track || track.segmentDuration <= 0 || time === undefined || time === null) {
             return null;
         }
 
         // Calculate index of the sprite given a time
-        const seq = Math.floor(time / track.segmentDuration);
-        const offset = time % track.segmentDuration;
+        if (isNaN(track.segmentDuration)) {
+            request = thumbnailTracks.getThumbnailRequestForTime(time);
+            if (request) {
+                track.segmentDuration = request.duration;
+            }
+        }
+
+        offset = time % track.segmentDuration;
+
         const thumbIndex = Math.floor((offset * track.tilesHor * track.tilesVert) / track.segmentDuration);
         // Create and return the thumbnail
         const thumbnail = new Thumbnail();
-        thumbnail.url = buildUrlFromTemplate(track, seq);
+
         thumbnail.width = Math.floor(track.widthPerTile);
         thumbnail.height = Math.floor(track.heightPerTile);
         thumbnail.x = Math.floor(thumbIndex % track.tilesHor) * track.widthPerTile;
         thumbnail.y = Math.floor(thumbIndex / track.tilesHor) * track.heightPerTile;
 
-        return thumbnail;
+        if ('readThumbnail' in track) {
+            return track.readThumbnail(time, (url) => {
+                thumbnail.url = url;
+                if (callback)
+                    callback(thumbnail);
+            });
+        } else {
+            if (!request) {
+                const seq = Math.floor(time / track.segmentDuration);
+                thumbnail.url = buildUrlFromTemplate(track, seq);
+            } else {
+                thumbnail.url = request.url;
+                track.segmentDuration = NaN;
+            }
+            if (callback)
+                callback(thumbnail);
+            return thumbnail;
+        }
     }
 
     function buildUrlFromTemplate(track, seq) {
@@ -92,11 +118,8 @@ function ThumbnailController(config) {
 
     function getBitrateList() {
         const tracks = thumbnailTracks.getTracks();
-        if (!tracks || tracks.length === 0) {
-            return [];
-        }
-
         let i = 0;
+
         return tracks.map((t) => {
             const bitrateInfo = new BitrateInfo();
             bitrateInfo.mediaType = Constants.IMAGE;

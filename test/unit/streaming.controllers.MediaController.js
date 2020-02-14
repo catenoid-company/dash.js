@@ -14,6 +14,7 @@ const objectUtils = ObjectUtils(context).getInstance();
 describe('MediaController', function () {
     let mediaController;
     let domStorageMock;
+    const trackType = Constants.AUDIO;
 
     beforeEach(function () {
 
@@ -180,8 +181,49 @@ describe('MediaController', function () {
                 roles: 1,
                 accessibility: 1,
                 audioChannelConfiguration: 1
-
             };
+            let equal = mediaController.isTracksEqual(track1, track2);
+            expect(equal).to.be.true; // jshint ignore:line
+        });
+
+        it('should return false if track1 is undefined or null', function () {
+
+            let track1 = null;
+
+            let track2 = {
+                id: 'id',
+                viewpoint: 'viewpoint',
+                lang: 'lang',
+                roles: 1,
+                accessibility: 1,
+                audioChannelConfiguration: 1
+            };
+            let equal = mediaController.isTracksEqual(track1, track2);
+            expect(equal).to.be.false; // jshint ignore:line
+        });
+
+        it('should return false if track2 is undefined or null', function () {
+
+            let track1 = {
+                id: 'id',
+                viewpoint: 'viewpoint',
+                lang: 'lang',
+                roles: 1,
+                accessibility: 1,
+                audioChannelConfiguration: 1
+            };
+
+            let track2 = null;
+
+            let equal = mediaController.isTracksEqual(track1, track2);
+            expect(equal).to.be.false; // jshint ignore:line
+        });
+
+        it('should return true if both tracks are undefined or null', function () {
+
+            let track1 = null;
+
+            let track2 = null;
             let equal = mediaController.isTracksEqual(track1, track2);
             expect(equal).to.be.true; // jshint ignore:line
         });
@@ -197,7 +239,7 @@ describe('MediaController', function () {
         });
 
         it('getTracksFor should return an empty array if parameters are defined, but internal tracks array is empty', function () {
-            const trackArray = mediaController.getTracksFor(Constants.VIDEO,{id: 'id'});
+            const trackArray = mediaController.getTracksFor(Constants.VIDEO, {id: 'id'});
 
             expect(trackArray).to.be.instanceOf(Array);    // jshint ignore:line
             expect(trackArray).to.be.empty;                // jshint ignore:line
@@ -210,8 +252,6 @@ describe('MediaController', function () {
         });
 
         it('should add and retrieve track', function () {
-
-            let trackType = 'audio';
             let streamInfo = {
                 id: 'id'
             };
@@ -229,9 +269,18 @@ describe('MediaController', function () {
             expect(objectUtils.areEqual(trackList[0], track)).to.be.true; // jshint ignore:line
         });
 
-        it('should add and set current track', function () {
+        it('should not set uncorrect track', function () {
+            let track = {};
+            let streamInfo = {
+                id: 'id'
+            };
 
-            let trackType = 'audio';
+            mediaController.setTrack(track);
+            let currentTrack = mediaController.getCurrentTrackFor(trackType, streamInfo);
+            expect(objectUtils.areEqual(currentTrack, track)).to.be.false; // jshint ignore:line
+        });
+
+        it('should add and set current track', function () {
             let streamInfo = {
                 id: 'id'
             };
@@ -249,8 +298,6 @@ describe('MediaController', function () {
         });
 
         it('should check current track', function () {
-
-            let trackType = 'audio';
             let streamInfo = {
                 id: 'id'
             };
@@ -272,9 +319,29 @@ describe('MediaController', function () {
             expect(currentTrack).to.be.true; // jshint ignore:line
         });
 
-        it('should emit Events.CURRENT_TRACK_CHANGED when track has changed', function (done) {
+        it('should check current track', function () {
+            let streamInfo = {
+                id: 'id'
+            };
+            let track = {
+                type: trackType,
+                streamInfo: streamInfo,
+                lang: 'fr',
+                viewpoint: 'viewpoint',
+                roles: 1,
+                accessibility: 1,
+                audioChannelConfiguration: 1
+            };
 
-            let trackType = 'audio';
+            mediaController.addTrack(track);
+            mediaController.setTrack(track);
+
+            // check that track has been added
+            let currentTrack = mediaController.isCurrentTrack(null);
+            expect(currentTrack).to.be.false; // jshint ignore:line
+        });
+
+        it('should emit Events.CURRENT_TRACK_CHANGED when track has changed', function (done) {
             let streamInfo = {
                 id: 'id'
             };
@@ -334,8 +401,6 @@ describe('MediaController', function () {
     describe('Initial Track Management', function () {
 
         it('should check initial media settings to choose initial track', function () {
-
-            let trackType = 'audio';
             let streamInfo = {
                 id: 'id'
             };
@@ -370,6 +435,85 @@ describe('MediaController', function () {
 
         });
 
+        it('should check initial media settings to choose initial track with a string/regex lang', function () {
+            const streamInfo = {
+                id: 'id'
+            };
+            const track = {
+                type: trackType,
+                streamInfo: streamInfo,
+                lang: 'fr',
+                viewpoint: 'viewpoint',
+                roles: 1,
+                accessibility: 1,
+                audioChannelConfiguration: 1
+            };
+
+            mediaController.addTrack(track);
+
+            let trackList = mediaController.getTracksFor(trackType, streamInfo);
+            expect(trackList).to.have.lengthOf(1);
+            expect(objectUtils.areEqual(trackList[0], track)).to.be.true; // jshint ignore:line
+
+            let currentTrack = mediaController.getCurrentTrackFor(trackType, streamInfo);
+            expect(objectUtils.areEqual(currentTrack, track)).to.be.false; // jshint ignore:line
+
+            // call to checkInitialMediaSettingsForType
+            mediaController.setInitialSettings(trackType, {
+                lang: 'fr|en|qtz',
+                viewpoint: 'viewpoint'
+            });
+            mediaController.checkInitialMediaSettingsForType(trackType, streamInfo);
+
+            currentTrack = mediaController.getCurrentTrackFor(trackType, streamInfo);
+            expect(objectUtils.areEqual(currentTrack, track)).to.be.true; // jshint ignore:line
+        });
+
+        it('should check initial media settings to choose initial track with a regex lang', function () {
+            const streamInfo = {
+                id: 'id'
+            };
+            const frTrack = {
+                type: trackType,
+                streamInfo: streamInfo,
+                lang: 'fr',
+                viewpoint: 'viewpoint',
+                roles: 1,
+                accessibility: 1,
+                audioChannelConfiguration: 1
+            };
+            const qtzTrack = {
+                type: trackType,
+                streamInfo: streamInfo,
+                lang: 'qtz',
+                viewpoint: 'viewpoint',
+                roles: 1,
+                accessibility: 1,
+                audioChannelConfiguration: 1
+            };
+
+            mediaController.addTrack(frTrack);
+            mediaController.addTrack(qtzTrack);
+
+            let trackList = mediaController.getTracksFor(trackType, streamInfo);
+            expect(trackList).to.have.lengthOf(2);
+            expect(objectUtils.areEqual(trackList[0], frTrack)).to.be.true; // jshint ignore:line
+            expect(objectUtils.areEqual(trackList[1], qtzTrack)).to.be.true; // jshint ignore:line
+
+            let currentTrack = mediaController.getCurrentTrackFor(trackType, streamInfo);
+            expect(objectUtils.areEqual(currentTrack, frTrack)).to.be.false; // jshint ignore:line
+            expect(objectUtils.areEqual(currentTrack, qtzTrack)).to.be.false; // jshint ignore:line
+
+            // call to checkInitialMediaSettingsForType
+            mediaController.setInitialSettings(trackType, {
+                lang: /qtz|mis/,
+                viewpoint: 'viewpoint'
+            });
+            mediaController.checkInitialMediaSettingsForType(trackType, streamInfo);
+
+            currentTrack = mediaController.getCurrentTrackFor(trackType, streamInfo);
+            expect(objectUtils.areEqual(currentTrack, qtzTrack)).to.be.true; // jshint ignore:line
+        });
     });
 
 });

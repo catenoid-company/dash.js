@@ -28,23 +28,28 @@
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-import BufferController from '../../controllers/BufferController';
-import AbrController from '../../controllers/AbrController';
 import FactoryMaker from '../../../core/FactoryMaker';
 import Debug from '../../../core/Debug';
 import SwitchRequest from '../SwitchRequest';
+import Constants from '../../constants/Constants';
+import MetricsConstants from '../../constants/MetricsConstants';
 
 function ThroughputRule(config) {
 
     config = config || {};
     const context = this.context;
-    const log = Debug(context).getInstance().log;
+    const dashMetrics = config.dashMetrics;
 
-    const metricsModel = config.metricsModel;
+    let instance,
+        logger;
+
+    function setup() {
+        logger = Debug(context).getInstance().getLogger(instance);
+    }
 
     function checkConfig() {
-        if (!metricsModel || !metricsModel.hasOwnProperty('getReadOnlyMetricsFor')) {
-            throw new Error('Missing config parameter(s)');
+        if (!dashMetrics || !dashMetrics.hasOwnProperty('getLatestBufferInfoVO')) {
+            throw new Error(Constants.MISSING_CONFIG_ERROR);
         }
     }
 
@@ -52,7 +57,7 @@ function ThroughputRule(config) {
         const switchRequest = SwitchRequest(context).create();
 
         if (!rulesContext || !rulesContext.hasOwnProperty('getMediaInfo') || !rulesContext.hasOwnProperty('getMediaType') || !rulesContext.hasOwnProperty('useBufferOccupancyABR') ||
-            !rulesContext.hasOwnProperty('getAbrController') || !rulesContext.hasOwnProperty('getStreamProcessor')) {
+            !rulesContext.hasOwnProperty('getAbrController') || !rulesContext.hasOwnProperty('getScheduleController')) {
             return switchRequest;
         }
 
@@ -60,26 +65,26 @@ function ThroughputRule(config) {
 
         const mediaInfo = rulesContext.getMediaInfo();
         const mediaType = rulesContext.getMediaType();
-        const metrics = metricsModel.getReadOnlyMetricsFor(mediaType);
-        const streamProcessor = rulesContext.getStreamProcessor();
+        const bufferStateVO = dashMetrics.getLatestBufferInfoVO(mediaType, true, MetricsConstants.BUFFER_STATE);
+        const scheduleController = rulesContext.getScheduleController();
         const abrController = rulesContext.getAbrController();
         const streamInfo = rulesContext.getStreamInfo();
         const isDynamic = streamInfo && streamInfo.manifestInfo ? streamInfo.manifestInfo.isDynamic : null;
         const throughputHistory = abrController.getThroughputHistory();
         const throughput = throughputHistory.getSafeAverageThroughput(mediaType, isDynamic);
         const latency = throughputHistory.getAverageLatency(mediaType);
-        const bufferStateVO = (metrics.BufferState.length > 0) ? metrics.BufferState[metrics.BufferState.length - 1] : null;
         const useBufferOccupancyABR = rulesContext.useBufferOccupancyABR();
 
-        if (!metrics || isNaN(throughput) || !bufferStateVO || useBufferOccupancyABR) {
+
+        if (isNaN(throughput) || !bufferStateVO || useBufferOccupancyABR) {
             return switchRequest;
         }
 
-        if (abrController.getAbandonmentStateFor(mediaType) !== AbrController.ABANDON_LOAD) {
-            if (bufferStateVO.state === BufferController.BUFFER_LOADED || isDynamic) {
+        if (abrController.getAbandonmentStateFor(mediaType) !== MetricsConstants.ABANDON_LOAD) {
+            if (bufferStateVO.state === MetricsConstants.BUFFER_LOADED || isDynamic) {
                 switchRequest.quality = abrController.getQualityForBitrate(mediaInfo, throughput, latency);
-                streamProcessor.getScheduleController().setTimeToLoadDelay(0);
-                log('ThroughputRule requesting switch to index: ', switchRequest.quality, 'type: ',mediaType, 'Average throughput', Math.round(throughput), 'kbps');
+                scheduleController.setTimeToLoadDelay(0);
+                logger.debug('[' + mediaType + '] requesting switch to index: ', switchRequest.quality, 'Average throughput', Math.round(throughput), 'kbps');
                 switchRequest.reason = {throughput: throughput, latency: latency};
             }
         }
@@ -91,10 +96,12 @@ function ThroughputRule(config) {
         // no persistent information to reset
     }
 
-    const instance = {
+    instance = {
         getMaxIndex: getMaxIndex,
         reset: reset
     };
+
+    setup();
 
     return instance;
 }

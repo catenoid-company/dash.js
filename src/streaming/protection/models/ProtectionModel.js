@@ -44,9 +44,10 @@
  * {@link module:ProtectionController}
  *
  * @interface ProtectionModel
+ * @ignore
  */
 
-let ProtectionModel = function () { };
+const ProtectionModel = function () { };
 
 /**
  * Returns an array of all initialization data currently used by
@@ -144,6 +145,8 @@ let ProtectionModel = function () { };
  * @memberof ProtectionModel
  * @param {string} sessionID the session ID corresponding to the persisted
  * session data to be loaded
+ * @param {ArrayBuffer} the corresponding initData PSSH box for the currently
+ * selected key system.
  */
 
 /**

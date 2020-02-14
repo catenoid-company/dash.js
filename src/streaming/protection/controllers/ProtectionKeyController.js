@@ -41,6 +41,7 @@ import ProtectionConstants from '../../constants/ProtectionConstants';
 
 /**
  * @module ProtectionKeyController
+ * @ignore
  * @description Media protection key system functionality that can be modified/overridden by applications
  */
 function ProtectionKeyController() {
@@ -48,7 +49,8 @@ function ProtectionKeyController() {
     let context = this.context;
 
     let instance,
-        log,
+        debug,
+        logger,
         keySystems,
         BASE64,
         clearkeyKeySystem,
@@ -57,8 +59,9 @@ function ProtectionKeyController() {
     function setConfig(config) {
         if (!config) return;
 
-        if (config.log) {
-            log = config.log;
+        if (config.debug) {
+            debug = config.debug;
+            logger = debug.getLogger(instance);
         }
 
         if (config.BASE64) {
@@ -85,7 +88,7 @@ function ProtectionKeyController() {
         clearkeyKeySystem = keySystem;
 
         // W3C ClearKey
-        keySystem = KeySystemW3CClearKey(context).getInstance({ BASE64: BASE64, log: log });
+        keySystem = KeySystemW3CClearKey(context).getInstance({ BASE64: BASE64, debug: debug });
         keySystems.push(keySystem);
         clearkeyW3CKeySystem = keySystem;
     }
@@ -102,6 +105,19 @@ function ProtectionKeyController() {
      */
     function getKeySystems() {
         return keySystems;
+    }
+
+    /**
+     * Sets the prioritized list of key systems to be supported
+     * by this player.
+     *
+     * @param {Array.<KeySystem>} newKeySystems the new prioritized
+     * list of key systems
+     * @memberof module:ProtectionKeyController
+     * @instance
+     */
+    function setKeySystems(newKeySystems) {
+        keySystems = newKeySystems;
     }
 
     /**
@@ -193,18 +209,13 @@ function ProtectionKeyController() {
                     if (cp.schemeIdUri.toLowerCase() === ks.schemeIdURI) {
                         // Look for DRM-specific ContentProtection
                         let initData = ks.getInitData(cp);
-                        if (!!initData) {
-                            supportedKS.push({
-                                ks: keySystems[ksIdx],
-                                initData: initData,
-                                cdmData: ks.getCDMData()
-                            });
-                        } else if (this.isClearKey(ks)) {
-                            supportedKS.push({
-                                ks: ks,
-                                initData: null
-                            });
-                        }
+
+                        supportedKS.push({
+                            ks: keySystems[ksIdx],
+                            initData: initData,
+                            cdmData: ks.getCDMData(),
+                            sessionId: ks.getSessionId(cp)
+                        });
                     }
                 }
             }
@@ -231,15 +242,19 @@ function ProtectionKeyController() {
     function getSupportedKeySystems(initData, protDataSet) {
         let supportedKS = [];
         let pssh = CommonEncryption.parsePSSHList(initData);
+        let ks, keySystemString, shouldNotFilterOutKeySystem;
 
         for (let ksIdx = 0; ksIdx < keySystems.length; ++ksIdx) {
-            let keySystemString = keySystems[ksIdx].systemString;
-            let shouldNotFilterOutKeySystem = (protDataSet) ? keySystemString in protDataSet : true;
+            ks = keySystems[ksIdx];
+            keySystemString = ks.systemString;
+            shouldNotFilterOutKeySystem = (protDataSet) ? keySystemString in protDataSet : true;
 
-            if (keySystems[ksIdx].uuid in pssh && shouldNotFilterOutKeySystem) {
+            if (ks.uuid in pssh && shouldNotFilterOutKeySystem) {
                 supportedKS.push({
-                    ks: keySystems[ksIdx],
-                    initData: pssh[keySystems[ksIdx].uuid]
+                    ks: ks,
+                    initData: pssh[ks.uuid],
+                    cdmData: ks.getCDMData(),
+                    sessionId: ks.getSessionId()
                 });
             }
         }
@@ -301,7 +316,7 @@ function ProtectionKeyController() {
         try {
             return clearkeyKeySystem.getClearKeysFromProtectionData(protData, message);
         } catch (error) {
-            log('Failed to retrieve clearkeys from ProtectionData');
+            logger.error('Failed to retrieve clearkeys from ProtectionData');
             return null;
         }
     }
@@ -329,6 +344,7 @@ function ProtectionKeyController() {
         isClearKey: isClearKey,
         initDataEquals: initDataEquals,
         getKeySystems: getKeySystems,
+        setKeySystems: setKeySystems,
         getKeySystemBySystemString: getKeySystemBySystemString,
         getSupportedKeySystemsFromContentProtection: getSupportedKeySystemsFromContentProtection,
         getSupportedKeySystems: getSupportedKeySystems,

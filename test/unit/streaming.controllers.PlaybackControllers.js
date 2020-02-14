@@ -1,11 +1,14 @@
 import PlaybackController from '../../src/streaming/controllers/PlaybackController';
 import Events from '../../src/core/events/Events';
 import EventBus from '../../src/core/EventBus';
+import Settings from '../../src/core/Settings';
 
-import MetricsModelMock from './mocks/MetricsModelMock';
 import VideoModelMock from './mocks/VideoModelMock';
 import MediaPlayerModelMock from './mocks/MediaPlayerModelMock';
 import DashMetricsMock from './mocks/DashMetricsMock';
+import StreamControllerMock from './mocks/StreamControllerMock';
+import URIFragmentModelMock from './mocks/URIFragmentModelMock';
+import AdapterMock from './mocks/AdapterMock';
 
 const expect = require('chai').expect;
 const context = {};
@@ -14,25 +17,33 @@ const eventBus = EventBus(context).getInstance();
 
 describe('PlaybackController', function () {
 
-    let playbackController;
-    let videoModelMock;
-    let metricsModelMock;
-    let dashMetricsMock;
-    let mediaPlayerModelMock;
+    let playbackController,
+        videoModelMock,
+        dashMetricsMock,
+        mediaPlayerModelMock,
+        streamControllerMock,
+        uriFragmentModelMock,
+        adapterMock,
+        settings;
 
     beforeEach(function () {
         videoModelMock = new VideoModelMock();
-        metricsModelMock = new MetricsModelMock();
         dashMetricsMock = new DashMetricsMock();
         mediaPlayerModelMock = new MediaPlayerModelMock();
-
+        streamControllerMock = new StreamControllerMock();
+        uriFragmentModelMock = new URIFragmentModelMock();
+        adapterMock = new AdapterMock();
         playbackController = PlaybackController(context).getInstance();
+        settings = Settings(context).getInstance();
 
         playbackController.setConfig({
             videoModel: videoModelMock,
-            metricsModel: metricsModelMock,
             dashMetrics: dashMetricsMock,
-            mediaPlayerModel: mediaPlayerModelMock
+            mediaPlayerModel: mediaPlayerModelMock,
+            streamController: streamControllerMock,
+            uriFragmentModel: uriFragmentModelMock,
+            adapter: adapterMock,
+            settings: settings
         });
     });
 
@@ -46,6 +57,13 @@ describe('PlaybackController', function () {
 
             expect(playbackController.getIsDynamic()).to.not.exist; // jshint ignore:line
             expect(playbackController.getLiveStartTime()).to.be.NaN; // jshint ignore:line
+            expect(playbackController.isPaused()).to.be.null; // jshint ignore:line
+            expect(playbackController.isSeeking()).to.be.null; // jshint ignore:line
+            expect(playbackController.getTime()).to.be.null; // jshint ignore:line
+            expect(playbackController.getPlaybackRate()).to.be.null; // jshint ignore:line
+            expect(playbackController.getPlayedRanges()).to.be.null; // jshint ignore:line
+            expect(playbackController.getEnded()).to.be.null; // jshint ignore:line
+            expect(playbackController.getCurrentLiveLatency()).to.be.NaN; // jshint ignore:line
 
             let streamInfo = {
                 manifestInfo: {
@@ -67,12 +85,18 @@ describe('PlaybackController', function () {
         beforeEach(function () {
             let streamInfo = {
                 manifestInfo: {
-                    isDynamic: true
+                    isDynamic: true,
+                    availableFrom: new Date()
                 },
                 start: 10
             };
 
             playbackController.initialize(streamInfo);
+        });
+
+        it('should return NaN when getLiveDelay is called after a call to computeLiveDelay with no parameter', function () {
+            expect(playbackController.computeLiveDelay.bind(playbackController)).not.to.throw();
+            expect(playbackController.getLiveDelay()).to.be.NaN; // jshint ignore:line
         });
 
         describe('video management', function () {
@@ -120,6 +144,11 @@ describe('PlaybackController', function () {
                 expect(playbackController.getTime()).to.equal(videoModelMock.time);
             });
 
+            it('should return current normalized video time', function () {
+                videoModelMock.time = 5;
+                expect(playbackController.getNormalizedTime()).to.equal(videoModelMock.time);
+            });
+
             it('should return video playback rate', function () {
                 videoModelMock.playbackRate = 2;
                 expect(playbackController.getPlaybackRate()).to.equal(videoModelMock.playbackRate);
@@ -133,6 +162,13 @@ describe('PlaybackController', function () {
             it('should return video ended ', function () {
                 videoModelMock.ended = true;
                 expect(playbackController.getEnded()).to.equal(videoModelMock.ended);
+            });
+
+            it('getStartTimeFromUriParameters should return the expected value', function () {
+                uriFragmentModelMock.setURIFragmentData({t: 18.2});
+                const uriParameters = playbackController.getStartTimeFromUriParameters();
+                expect(uriParameters.fragT).to.exist; // jshint ignore:line
+                expect(uriParameters.fragT).to.equal(18.2);
             });
         });
 
@@ -260,6 +296,36 @@ describe('PlaybackController', function () {
 
                 eventBus.on(Events.PLAYBACK_ERROR, onError, this);
                 videoModelMock.fireEvent('error', [{target: { error: 'error'}}]);
+            });
+
+            it('should handle stalled event', function (done) {
+                let onStalled = function () {
+                    eventBus.off(Events.PLAYBACK_STALLED, onStalled);
+                    done();
+                };
+
+                eventBus.on(Events.PLAYBACK_STALLED, onStalled, this);
+                videoModelMock.fireEvent('stalled');
+            });
+
+            it('should handle timeupdate event', function (done) {
+                let onTimeUpdated = function () {
+                    eventBus.off(Events.PLAYBACK_TIME_UPDATED, onTimeUpdated);
+                    done();
+                };
+
+                eventBus.on(Events.PLAYBACK_TIME_UPDATED, onTimeUpdated, this);
+                videoModelMock.fireEvent('timeupdate');
+            });
+
+            it('should handle waiting event', function (done) {
+                let onPlaybackWaiting = function () {
+                    eventBus.off(Events.PLAYBACK_WAITING, onPlaybackWaiting);
+                    done();
+                };
+
+                eventBus.on(Events.PLAYBACK_WAITING, onPlaybackWaiting, this);
+                videoModelMock.fireEvent('waiting');
             });
         });
 

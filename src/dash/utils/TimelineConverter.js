@@ -104,7 +104,6 @@ function TimelineConverter() {
     }
 
     function calcPresentationTimeFromWallTime(wallTime, period) {
-        //console.log("XXX", wallTime.getTime() - period.mpd.availabilityStartTime.getTime(), clientServerTimeShift * 1000, clientServerTimeShift, period.mpd.availabilityStartTime.getTime())
         return ((wallTime.getTime() - period.mpd.availabilityStartTime.getTime() + clientServerTimeShift * 1000) / 1000);
     }
 
@@ -137,7 +136,6 @@ function TimelineConverter() {
     }
 
     function calcSegmentAvailabilityRange(voRepresentation, isDynamic) {
-
         // Static Range Finder
         const voPeriod = voRepresentation.adaptation.period;
         const range = { start: voPeriod.start, end: voPeriod.start + voPeriod.duration };
@@ -147,14 +145,40 @@ function TimelineConverter() {
             return voRepresentation.segmentAvailabilityRange;
         }
 
-        //Dyanmic Range Finder
+        // Dynamic Range Finder
         const d = voRepresentation.segmentDuration || (voRepresentation.segments && voRepresentation.segments.length ? voRepresentation.segments[voRepresentation.segments.length - 1].duration : 0);
         const now = calcPresentationTimeFromWallTime(new Date(), voPeriod);
         const periodEnd = voPeriod.start + voPeriod.duration;
         range.start = Math.max((now - voPeriod.mpd.timeShiftBufferDepth), voPeriod.start);
-        range.end = now >= periodEnd && now - d < periodEnd ? periodEnd - d : now - d;
+
+        const endOffset = voRepresentation.availabilityTimeOffset !== undefined &&
+            voRepresentation.availabilityTimeOffset < d ? d - voRepresentation.availabilityTimeOffset : d;
+
+        range.end = now >= periodEnd && now - endOffset < periodEnd ? periodEnd : now - endOffset;
 
         return range;
+    }
+
+    function getPeriodEnd(voRepresentation, isDynamic) {
+        // Static Range Finder
+        const voPeriod = voRepresentation.adaptation.period;
+        if (!isDynamic) {
+            return voPeriod.start + voPeriod.duration;
+        }
+
+        if (!isClientServerTimeSyncCompleted && voRepresentation.segmentAvailabilityRange) {
+            return voRepresentation.segmentAvailabilityRange;
+        }
+
+        // Dynamic Range Finder
+        const d = voRepresentation.segmentDuration || (voRepresentation.segments && voRepresentation.segments.length ? voRepresentation.segments[voRepresentation.segments.length - 1].duration : 0);
+        const now = calcPresentationTimeFromWallTime(new Date(), voPeriod);
+        const periodEnd = voPeriod.start + voPeriod.duration;
+
+        const endOffset = voRepresentation.availabilityTimeOffset !== undefined &&
+            voRepresentation.availabilityTimeOffset < d ? d - voRepresentation.availabilityTimeOffset : d;
+
+        return Math.min(now - endOffset, periodEnd);
     }
 
     function calcPeriodRelativeTimeFromMpdRelativeTime(representation, mpdRelativeTime) {
@@ -172,18 +196,9 @@ function TimelineConverter() {
         if (isClientServerTimeSyncCompleted) return;
 
         if (e.offset !== undefined) {
-
             setClientTimeOffset(e.offset / 1000);
             isClientServerTimeSyncCompleted = true;
-
         }
-    }
-
-    function calcMSETimeOffset(representation) {
-        // The MSEOffset is offset from AST for media. It is Period@start - presentationTimeOffset
-        const presentationOffset = representation.presentationTimeOffset;
-        const periodStart = representation.adaptation.period.start;
-        return (periodStart - presentationOffset);
     }
 
     function resetInitialSettings() {
@@ -212,8 +227,8 @@ function TimelineConverter() {
         calcPeriodRelativeTimeFromMpdRelativeTime: calcPeriodRelativeTimeFromMpdRelativeTime,
         calcMediaTimeFromPresentationTime: calcMediaTimeFromPresentationTime,
         calcSegmentAvailabilityRange: calcSegmentAvailabilityRange,
+        getPeriodEnd: getPeriodEnd,
         calcWallTimeForSegment: calcWallTimeForSegment,
-        calcMSETimeOffset: calcMSETimeOffset,
         reset: reset
     };
 
