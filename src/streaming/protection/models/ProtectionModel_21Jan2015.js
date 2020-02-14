@@ -74,11 +74,13 @@ function ProtectionModel_21Jan2015(config) {
     }
 
     function getManifestType() {
-        return manifestType;
+        //return manifestType;
+        return (typeof manifestType !== 'undefined') ? manifestType : 'static';
     }
 
     function setManifestType(value) {
-        manifestType = value || 'static';
+        //manifestType = value || 'static';
+        manifestType = value;
     }
 
     function reset() {
