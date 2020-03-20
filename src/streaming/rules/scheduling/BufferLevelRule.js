@@ -89,6 +89,19 @@ function BufferLevelRule(config) {
                 bufferTarget = mediaPlayerModel.getStableBufferTime();
             }
         }
+
+        // Catenoid patch: 2020/3/19
+        // 4K 영상 버퍼 넘치는 문제: https://trello.com/c/YuW11zkb
+        if ((type == Constants.AUDIO || type == Constants.VIDEO) && videoTrackPresent) {
+            const videoBitrate = abrController.getCurrentVideoBitrate();
+            if (videoBitrate && videoBitrate.bitrate > 0) {
+                // 60MB 를 채우는데 필요한 시간 계산 
+                const maxTime = 60*1024*1024*8 / videoBitrate.bitrate;
+                if (bufferTarget > maxTime) {
+                    bufferTarget = maxTime;
+                }
+            }
+        }
         return bufferTarget;
     }
 

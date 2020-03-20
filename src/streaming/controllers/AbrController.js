@@ -635,6 +635,22 @@ function AbrController() {
         }
     }
 
+
+    // Catenoid patch: 2020/3/19
+    // 4K 영상 버퍼 넘치는 문제: https://trello.com/c/YuW11zkb
+    function getCurrentVideoBitrate() {
+        if (streamProcessorDict && streamProcessorDict[Constants.VIDEO]) {
+            const streamInfo = streamProcessorDict[Constants.VIDEO].getStreamInfo();
+            if (streamInfo && streamInfo.id) {
+                const idx = getQualityFor(Constants.VIDEO);
+                const bitrates = getBitrateList(streamProcessorDict[Constants.VIDEO].getMediaInfo());
+                return bitrates[idx] ? bitrates[idx] : null;
+            }
+        }
+        return null;
+    }
+
+
     instance = {
         isPlayingAtTopQuality: isPlayingAtTopQuality,
         updateTopQualityIndex: updateTopQualityIndex,
@@ -656,7 +672,8 @@ function AbrController() {
         registerStreamType: registerStreamType,
         unRegisterStreamType: unRegisterStreamType,
         setConfig: setConfig,
-        reset: reset
+        reset: reset,
+        getCurrentVideoBitrate: getCurrentVideoBitrate,
     };
 
     setup();
