@@ -51,6 +51,8 @@ function ManifestUpdater() {
         errHandler,
         settings;
 
+    let targetRefreshAbsoluteTime = 0; // Catenoid patch: 2020/03/17
+
     function setup() {
         logger = Debug(context).getInstance().getLogger(instance);
     }
@@ -92,6 +94,7 @@ function ManifestUpdater() {
         refreshDelay = NaN;
         isUpdating = false;
         isPaused = true;
+        targetRefreshAbsoluteTime = 0; // Catenoid patch: 2020/03/17
         stopManifestRefreshTimer();
     }
 
@@ -148,6 +151,7 @@ function ManifestUpdater() {
         if (refreshDelay * 1000 > 0x7FFFFFFF) {
             refreshDelay = 0x7FFFFFFF / 1000;
         }
+        targetRefreshAbsoluteTime = new Date().getTime() + refreshDelay*1000; // Catenoid patch: 2020/03/17
         eventBus.trigger(Events.MANIFEST_UPDATED, {manifest: manifest});
         logger.info('Manifest has been refreshed at ' + date + '[' + date.getTime() / 1000 + '] ');
 
@@ -177,7 +181,14 @@ function ManifestUpdater() {
 
     function onPlaybackStarted (/*e*/) {
         isPaused = false;
-        startManifestRefreshTimer();
+        // Catenoid patch: 2020/03/17
+        // Manifest 를 업데이트 하려고 마음 먹은 시간 이후에 play 를 누르면 곧바로 manifest 를 업데이트 하도록 한다.
+        // (이 patch 가 없으면 mpd 에 기록된 delay time 만큼 기다린 다음에 manifest 를 받음)
+        let delay = undefined;
+        if (targetRefreshAbsoluteTime > 0 && new Date().getTime() > targetRefreshAbsoluteTime) {
+            delay = 10;
+        }
+        startManifestRefreshTimer(delay);
     }
 
     function onPlaybackPaused(/*e*/) {
