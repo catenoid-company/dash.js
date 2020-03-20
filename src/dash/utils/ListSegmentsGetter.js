@@ -47,7 +47,7 @@ function ListSegmentsGetter(config, isDynamic) {
         }
     }
 
-    function getSegmentByIndex(representation, index) {
+    function getSegmentByIndex(representation, index, lastSegmentTime, checkOvertime) {
         checkConfig();
 
         if (!representation) {
@@ -63,7 +63,9 @@ function ListSegmentsGetter(config, isDynamic) {
         if (index < len) {
             const s = list.SegmentURL_asArray[index];
 
-            segment = getIndexBasedSegment(timelineConverter, isDynamic, representation, index);
+            // Catenoid Patch: 2020/3/19
+            // 마지막부분 무한로딩 이슈 (https://trello.com/c/Wa8ywiSv)
+            segment = getIndexBasedSegment(timelineConverter, isDynamic, representation, index, checkOvertime);
             if (typeof segment === 'undefined' || segment === null) return null;
             segment.replacementTime = (start + index - 1) * representation.segmentDuration;
             segment.media = s.media ? s.media : '';

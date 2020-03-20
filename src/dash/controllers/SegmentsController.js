@@ -101,9 +101,11 @@ function SegmentsController(config) {
         return representation ? representation.segments ? getters[DashConstants.SEGMENT_BASE] : getters[representation.segmentInfoType] : null;
     }
 
-    function getSegmentByIndex(representation, index, lastSegmentTime) {
+    // Catenoid Patch: 2020/3/19
+    // 마지막부분 무한로딩 이슈 (https://trello.com/c/Wa8ywiSv)
+    function getSegmentByIndex(representation, index, lastSegmentTime, checkOvertime) {
         const getter = getSegmentsGetter(representation);
-        return getter ? getter.getSegmentByIndex(representation, index, lastSegmentTime) : null;
+        return getter ? getter.getSegmentByIndex(representation, index, lastSegmentTime, checkOvertime) : null;
     }
 
     function getSegmentByTime(representation, time) {
