@@ -673,7 +673,7 @@ function AbrController() {
         unRegisterStreamType: unRegisterStreamType,
         setConfig: setConfig,
         reset: reset,
-        getCurrentVideoBitrate: getCurrentVideoBitrate,
+        getCurrentVideoBitrate: getCurrentVideoBitrate
     };
 
     setup();
