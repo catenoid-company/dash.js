@@ -81,6 +81,7 @@ function ScheduleController(config) {
         liveEdgeFinder,
         isReplacementRequest;
 
+    let qualityChangeRequested = false;
     function setup() {
         logger = Debug(context).getInstance().getLogger(instance);
         if (playbackController && playbackController.getIsDynamic()) {
@@ -187,7 +188,14 @@ function ScheduleController(config) {
             return;
         }
 
-        validateExecutedFragmentRequest();
+        // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+        // validate 함수는 dash quality segment 처리 함수인데, 제대로 동작 안 해서 막음.
+        // 대신, quality 변경시 next fragment position 을 현재 시간으로 잡도록 seekTarget 설정해줌.
+        //validateExecutedFragmentRequest();
+        if (qualityChangeRequested) {
+            setSeekTarget(playbackController.getTime());
+            qualityChangeRequested = false;
+        }
 
         const isReplacement = replaceRequestArray.length > 0;
         const streamInfo = streamProcessor.getStreamInfo();
@@ -255,6 +263,8 @@ function ScheduleController(config) {
         }
     }
 
+    // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+    /*
     function validateExecutedFragmentRequest() {
         // Validate that the fragment request executed and appended into the source buffer is as
         // good of quality as the current quality and is the correct media track.
@@ -292,6 +302,7 @@ function ScheduleController(config) {
             }
         }
     }
+    */
 
     function startScheduleTimer(value) {
         clearTimeout(scheduleTimeout);
@@ -344,6 +355,12 @@ function ScheduleController(config) {
 
         clearPlayListTraceMetrics(new Date(), PlayListTrace.REPRESENTATION_SWITCH_STOP_REASON);
         createPlaylistTraceMetrics();
+
+        // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+        // Quality 변경시 기존 buffer 정리하고, 다음 schedule 시 현재 시간 기준으로 buffering 받게 함
+        streamProcessor.getBufferController().pruneAllSafely();
+        qualityChangeRequested = true;
+        startScheduleTimer(0);
     }
 
     function completeQualityChange(trigger) {
