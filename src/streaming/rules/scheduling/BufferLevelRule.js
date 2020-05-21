@@ -38,8 +38,8 @@ function BufferLevelRule(config) {
     const dashMetrics = config.dashMetrics;
     const mediaPlayerModel = config.mediaPlayerModel;
     const textController = config.textController;
-    const abrController = config.abrController;
-    const settings = config.settings;
+    //const abrController = config.abrController;
+    //const settings = config.settings;
 
     function setup() {
     }
@@ -81,6 +81,10 @@ function BufferLevelRule(config) {
                 bufferTarget = Math.max(videoBufferLevel, representationInfo.fragmentDuration);
             }
         } else {
+            // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+            // Top quality 와 아닌 quality 의 값이 달라져서, top quality 에서 해상도 변경할 때 해상도가 늦게 바뀌는 문제가 있어서 
+            // 같은 값을 넘겨주도록 함.
+            /*
             const streamInfo = representationInfo.mediaInfo.streamInfo;
             if (abrController.isPlayingAtTopQuality(streamInfo)) {
                 const isLongFormContent = streamInfo.manifestInfo.duration >= settings.get().streaming.longFormContentDurationThreshold;
@@ -88,6 +92,8 @@ function BufferLevelRule(config) {
             } else {
                 bufferTarget = mediaPlayerModel.getStableBufferTime();
             }
+            */
+            bufferTarget = mediaPlayerModel.getStableBufferTime();
         }
         return bufferTarget;
     }
