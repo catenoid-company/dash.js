@@ -94,7 +94,6 @@ function BufferLevelRule(config) {
             }
             */
             bufferTarget = mediaPlayerModel.getStableBufferTime();
-        }
 
         // Catenoid patch: 2020/3/19
         // 4K 영상 버퍼 넘치는 문제: https://trello.com/c/YuW11zkb
