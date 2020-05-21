@@ -38,7 +38,7 @@ function BufferLevelRule(config) {
     const dashMetrics = config.dashMetrics;
     const mediaPlayerModel = config.mediaPlayerModel;
     const textController = config.textController;
-    //const abrController = config.abrController;
+    const abrController = config.abrController;
     //const settings = config.settings;
 
     function setup() {
