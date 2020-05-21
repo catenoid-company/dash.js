@@ -346,8 +346,6 @@ function BufferController(config) {
 
     // Prune full buffer but what is around current time position
     function pruneAllSafely() {
-        // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
-        // buffer 초기화 전에 quality 변경 요청시 pruneAllSafely 호출될 수 있어서 조건 추가.
         if (buffer) {
             buffer.waitForUpdateEnd(() => {
                 const ranges = getAllRangesWithSafetyFactor();

@@ -190,18 +190,20 @@ function ScheduleController(config) {
 
         // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
         // validate 함수는 dash quality segment 처리 함수인데, 제대로 동작 안 해서 막음.
-        // 대신, quality 변경시 next fragment position 을 현재 시간으로 잡도록 seekTarget 설정해줌.
         //validateExecutedFragmentRequest();
-        if (qualityChangeRequested) {
-            setSeekTarget(playbackController.getTime());
-            qualityChangeRequested = false;
-        }
 
         const isReplacement = replaceRequestArray.length > 0;
         const streamInfo = streamProcessor.getStreamInfo();
-        if (bufferResetInProgress || isNaN(lastInitQuality) || switchTrack || isReplacement ||
+        if (qualityChangeRequested || bufferResetInProgress || isNaN(lastInitQuality) || switchTrack || isReplacement ||
             hasTopQualityChanged(currentRepresentationInfo.mediaInfo.type, streamInfo.id) ||
             bufferLevelRule.execute(streamProcessor, streamController.isTrackTypePresent(Constants.VIDEO))) {
+
+            // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+            // quality 변경시 next fragment position 을 현재 시간으로 잡도록 seekTarget 설정해줌.
+            if (qualityChangeRequested) {
+                setSeekTarget(playbackController.getTime());
+                qualityChangeRequested = false;
+            }
 
             const getNextFragment = function () {
                 if ((currentRepresentationInfo.quality !== lastInitQuality || switchTrack) && (!bufferResetInProgress)) {
@@ -357,8 +359,7 @@ function ScheduleController(config) {
         createPlaylistTraceMetrics();
 
         // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
-        // Quality 변경시 기존 buffer 정리하고, 다음 schedule 시 현재 시간 기준으로 buffering 받게 함
-        streamProcessor.getBufferController().pruneAllSafely();
+        // 다음 schedule 시 현재 시간 기준으로 buffering 받게 함 (buffer 검사할 때 quality 도 검사하게 patch 되어 있어서, overwrite 됨)
         qualityChangeRequested = true;
         startScheduleTimer(0);
     }
