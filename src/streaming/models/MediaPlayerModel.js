@@ -36,7 +36,9 @@ import Settings from '../../core/Settings';
 import { checkParameterType} from '../utils/SupervisorTools';
 
 
-const DEFAULT_MIN_BUFFER_TIME = 12;
+// Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+// 기본적으로 fast_switch 를 하는 것이므로, min_buffer_time 맞춰줌
+const DEFAULT_MIN_BUFFER_TIME = 20;
 const DEFAULT_MIN_BUFFER_TIME_FAST_SWITCH = 20;
 
 const DEFAULT_LOW_LATENCY_LIVE_DELAY = 3.0;
