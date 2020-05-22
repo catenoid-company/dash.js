@@ -77,7 +77,9 @@ function FragmentModel(config) {
         };
 
         const isEqualMedia = function (req1, req2) {
-            return !isNaN(req1.index) && (req1.startTime === req2.startTime) && (req1.adaptationIndex === req2.adaptationIndex) && (req1.type === req2.type);
+            // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+            // Buffer 존재를 검사할 때 quality 가 다르면 다르다고 판단하게 함 (해상도 변경 중 buffering 이 되었는데 재생 멈추는 증상 수정)
+            return !isNaN(req1.index) && (req1.startTime === req2.startTime) && (req1.adaptationIndex === req2.adaptationIndex) && (req1.type === req2.type) && (req1.quality === req2.quality);
         };
 
         const isEqualInit = function (req1, req2) {
