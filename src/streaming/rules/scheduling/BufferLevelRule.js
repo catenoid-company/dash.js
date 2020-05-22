@@ -82,12 +82,17 @@ function BufferLevelRule(config) {
             }
         } else {
             const streamInfo = representationInfo.mediaInfo.streamInfo;
+            // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+            // Top quality 에 대해서만 따로 buffering 시간을 다르게 줄 필요는 없어 보여서 막음 (해상도 변경 지연 방지)
+            /*
             if (abrController.isPlayingAtTopQuality(streamInfo)) {
                 const isLongFormContent = streamInfo.manifestInfo.duration >= settings.get().streaming.longFormContentDurationThreshold;
                 bufferTarget = isLongFormContent ? settings.get().streaming.bufferTimeAtTopQualityLongForm : settings.get().streaming.bufferTimeAtTopQuality;
             } else {
                 bufferTarget = mediaPlayerModel.getStableBufferTime();
             }
+            */
+            bufferTarget = mediaPlayerModel.getStableBufferTime();
         }
 
         // Catenoid patch: 2020/3/19
