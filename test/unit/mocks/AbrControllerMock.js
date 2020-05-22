@@ -108,6 +108,8 @@ function AbrControllerMock () {
 
 
     this.getMinAllowedIndexFor = function () {};
+
+    this.getCurrentVideoBitrate = function () {};
 }
 
 export default AbrControllerMock;

@@ -416,7 +416,10 @@ function PlaybackController() {
         if (currentTime > DVRWindow.end) {
             actualTime = Math.max(DVRWindow.end - streamInfo.manifestInfo.minBufferTime * 2, DVRWindow.start);
 
-        } else if (currentTime > 0 && currentTime + 0.250 < DVRWindow.start && Math.abs(currentTime - DVRWindow.start) < 315360000) {
+        } else if (currentTime > 0 && currentTime + /*0.250*/2.5 < DVRWindow.start && Math.abs(currentTime - DVRWindow.start) < 315360000) {
+            // Catenoid patch: 2020/03/17
+            // video element 의 currentTime 과 local time 기준의 DVRWindow.start 가 정상 재생 중에도 250msec-1.5s 로 벌어지는 일이 자주 있어서,
+            // seek 로 인한 로딩아이콘 출현/ 오디오 튀는 현상등이 나옴. 기준을 2.5초로 늘림.
 
             // Checking currentTime plus 250ms as the 'timeupdate' is fired with a frequency between 4Hz and 66Hz
             // https://developer.mozilla.org/en-US/docs/Web/Events/timeupdate

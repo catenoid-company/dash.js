@@ -308,7 +308,15 @@ function DashHandler(config) {
         logger.debug('Getting the next request at index: ' + indexToRequest);
 
         // check that there is a segment in this index
-        const segment = segmentsController.getSegmentByIndex(representation, indexToRequest, lastSegment ? lastSegment.mediaStartTime : -1);
+
+        // Catenoid Patch: 2020/3/19
+        // 마지막부분 무한로딩 이슈 (https://trello.com/c/Wa8ywiSv)
+        let segment = segmentsController.getSegmentByIndex(representation, indexToRequest, lastSegment ? lastSegment.mediaStartTime : -1, true);
+        const isOvertime = (segment && segment.overtime) ? true : false;
+        if (isOvertime) {
+            segment = null;
+        }
+        // Patch end
         if (!segment && isEndlessMedia(representation)) {
             logger.debug('No segment found at index: ' + indexToRequest + '. Wait for next loop');
             return null;
@@ -328,7 +336,9 @@ function DashHandler(config) {
         if (segment) {
             lastSegment = segment;
         } else {
-            const finished = isMediaFinished(representation, segment);
+            // Catenoid Patch: 2020/3/19
+            // 마지막부분 무한로딩 이슈 (https://trello.com/c/Wa8ywiSv)
+            const finished = isOvertime || isMediaFinished(representation, segment);
             if (finished) {
                 request = new FragmentRequest();
                 request.action = FragmentRequest.ACTION_COMPLETE;
