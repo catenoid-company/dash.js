@@ -94,10 +94,18 @@ function NextFragmentRequestRule(config) {
                 keepIdx: !hasSeekTarget && !bufferIsDivided
             });
 
-            // Then, check if this request was downloaded or not
+            // Catenoid Patch
+            // Stream 사이 gap 이 있는 경우, request 를 못 찾고 여기서 끝까지 도는 것 같음 (상황이 명확하지는 않음)
+            // 받아야 할 request 가 x 번 index 인데, 이미 동일한 request 가 있으면 다음 schedule 에서 다시 받으면 될 것으로 보여져서, request 안 주게 함.
+            /*
             while (request && request.action !== FragmentRequest.ACTION_COMPLETE && streamProcessor.getFragmentModel().isFragmentLoaded(request)) {
                 // loop until we found not loaded fragment, or no fragment
                 request = streamProcessor.getFragmentRequest(representationInfo);
+            }
+            */
+            if (request && request.action !== FragmentRequest.ACTION_COMPLETE && streamProcessor.getFragmentModel().isFragmentLoaded(request)) {
+                logger.warn('Duplicated request. skip.', mediaType, request.index, request.quality);
+                return null;
             }
         }
 
