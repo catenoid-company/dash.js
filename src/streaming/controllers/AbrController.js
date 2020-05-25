@@ -297,6 +297,7 @@ function AbrController() {
         }
     }
 
+    let prevAutoMode = true;
     function checkPlaybackQuality(type) {
         if (type  && streamProcessorDict && streamProcessorDict[type]) {
             const streamInfo = streamProcessorDict[type].getStreamInfo();
@@ -339,6 +340,21 @@ function AbrController() {
                     const bufferLevel = dashMetrics.getCurrentBufferLevel(type, true);
                     logger.debug('[' + type + '] stay on ' + oldQuality + '/' + topQualityIdx + ' (buffer: ' + bufferLevel + ')');
                 }
+
+                if (type === Constants.VIDEO) {
+                    if (!prevAutoMode && newQuality === oldQuality) {
+                        // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+                        // 해상도 변경 요청을 조용히 무시하는 경우, event 전송
+                        eventBus.trigger(Events.QUALITY_CHANGE_RENDERED, {
+                            mediaType: type,
+                            oldQuality,
+                            newQuality
+                        });
+                    }
+                    prevAutoMode = true;
+                }
+            } else if (type === Constants.VIDEO) {
+                prevAutoMode = false;
             }
         }
     }
@@ -352,6 +368,14 @@ function AbrController() {
         const topQualityIdx = getTopQualityIndexFor(type, id);
         if (newQuality !== oldQuality && newQuality >= 0 && newQuality <= topQualityIdx) {
             changeQuality(type, oldQuality, newQuality, topQualityIdx, reason);
+        } else if (newQuality === oldQuality && newQuality >= 0 && newQuality <= topQualityIdx) {
+            // Catenoid Patch: https://wiki.catenoid.net/pages/viewpage.action?pageId=12647122
+            // 해상도 변경 요청을 조용히 무시하는 경우, event 전송
+            eventBus.trigger(Events.QUALITY_CHANGE_RENDERED, {
+                mediaType: type,
+                oldQuality,
+                newQuality
+            });
         }
     }
 
