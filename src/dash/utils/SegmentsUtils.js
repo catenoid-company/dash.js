@@ -163,7 +163,7 @@ function isSegmentAvailable(timelineConverter, representation, segment, isDynami
     return true;
 }
 
-export function getIndexBasedSegment(timelineConverter, isDynamic, representation, index) {
+export function getIndexBasedSegment(timelineConverter, isDynamic, representation, index, checkOvertime) {
     let duration,
         presentationStartTime,
         presentationEndTime;
@@ -188,6 +188,12 @@ export function getIndexBasedSegment(timelineConverter, isDynamic, representatio
                       timelineConverter, presentationEndTime, isDynamic, index);
 
     if (!isSegmentAvailable(timelineConverter, representation, segment, isDynamic)) {
+        // Catenoid Patch: 2020/3/19
+        // 마지막부분 무한로딩 이슈 (https://trello.com/c/Wa8ywiSv)
+        if (checkOvertime) {
+            segment.overtime = true;
+            return segment;
+        }
         return null;
     }
 

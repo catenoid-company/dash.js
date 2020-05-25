@@ -182,6 +182,7 @@ function StreamController() {
         }
     }
 
+    let forceSeeked = false;
     function onWallclockTimeUpdated(/*e*/) {
         if (!settings.get().streaming.jumpGaps || getActiveStreamProcessors() === 0 ||
             playbackController.isSeeking() || isPaused || isStreamSwitchingInProgress ||
@@ -196,6 +197,7 @@ function StreamController() {
                 jumpGap(currentTime);
             } else {
                 lastPlaybackTime = currentTime;
+                forceSeeked = false;
             }
             wallclockTicked = 0;
         }
@@ -203,7 +205,10 @@ function StreamController() {
 
     function jumpGap(time) {
         const streamProcessors = getActiveStreamProcessors();
-        const smallGapLimit = settings.get().streaming.smallGapLimit;
+        // Catenoid Patch
+        // segment 간격이 넓어서 재생 못하는 경우 jump 하는 gap 을 2.9초로 늘림
+        //const smallGapLimit = settings.get().streaming.smallGapLimit;
+        const smallGapLimit = 2.9;
         let seekToPosition;
 
         // Find out what is the right time position to jump to taking
@@ -226,8 +231,21 @@ function StreamController() {
                 const gap = nextRangeStartTime - time;
                 if (gap > 0 && gap <= smallGapLimit) {
                     if (seekToPosition === undefined || nextRangeStartTime > seekToPosition) {
-                        seekToPosition = nextRangeStartTime;
+                        logger.warn('Set forced jump point to next segment', gap);
+                        seekToPosition = nextRangeStartTime + 0.1;
                     }
+                }
+            }
+
+            // Catenoid Patch
+            // buffer gap 사이에 있는 게 아닌 데도 segment 상황에 따라 재생을 못하는 경우가 있어서,
+            // buffer 가 있는데 멈춰 있으면 강제로 seek 시도
+            if (!forceSeeked && seekToPosition === undefined) {
+                const bufEnd = ranges.end(ranges.length - 1);
+                if (time < (bufEnd - smallGapLimit - 0.1)) {
+                    seekToPosition = time + smallGapLimit;
+                    forceSeeked = true;
+                    logger.warn('Set forced jump point', seekToPosition);
                 }
             }
         }
@@ -240,10 +258,10 @@ function StreamController() {
         // If there is a safe position to jump to, do the seeking
         if (seekToPosition > 0) {
             if (!isNaN(timeToStreamEnd) && seekToPosition >= time + timeToStreamEnd) {
-                logger.info('Jumping media gap (discontinuity) at time ', time, '. Jumping to end of the stream');
+                logger.warn('Jumping media gap (discontinuity) at time ', time, '. Jumping to end of the stream');
                 eventBus.trigger(Events.PLAYBACK_ENDED, {'isLast': getActiveStreamInfo().isLast});
             } else {
-                logger.info('Jumping media gap (discontinuity) at time ', time, '. Jumping to time position', seekToPosition);
+                logger.warn('Jumping media gap (discontinuity) at time ', time, '. Jumping to time position', seekToPosition);
                 playbackController.seek(seekToPosition, true, true);
             }
         }

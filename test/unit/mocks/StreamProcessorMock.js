@@ -116,6 +116,10 @@ function StreamProcessorMock (testType, streamInfo) {
     this.switchInitData = function () {};
 
     this.reset = function () {};
+
+    this.getBufferLevelWithGap = function () {
+        return -1;
+    };
 }
 
 export default StreamProcessorMock;

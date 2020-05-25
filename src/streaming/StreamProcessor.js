@@ -346,6 +346,12 @@ function StreamProcessor(config) {
         return bufferController ? bufferController.getBufferLevel() : 0;
     }
 
+    // Catenoid Patch
+    // segment 사이 gap 이 큰 경우, 무한 buffering 하는 증상 수정
+    function getBufferLevelWithGap() {
+        return bufferController ? bufferController.getBufferLevelWithGap() : -1;
+    }
+
     function switchInitData(representationId, bufferResetEnabled) {
         if (bufferController) {
             const streamInfo = getStreamInfo();
@@ -478,7 +484,8 @@ function StreamProcessor(config) {
         resetIndexHandler: resetIndexHandler,
         getInitRequest: getInitRequest,
         getFragmentRequest: getFragmentRequest,
-        reset: reset
+        reset: reset,
+        getBufferLevelWithGap: getBufferLevelWithGap
     };
 
     setup();

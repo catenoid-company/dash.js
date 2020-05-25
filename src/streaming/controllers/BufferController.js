@@ -513,6 +513,16 @@ function BufferController(config) {
         return length;
     }
 
+    // Catenoid Patch
+    // segment 사이 gap 이 큰 경우, 무한 buffering 하는 증상 수정
+    function getBufferLevelWithGap() {
+        // gap 을 2.5 을 주고 bufferLevel 계산하게 함(segment 간격 2.5 가 나도 이어서 계산하게 됨)
+        // 중요: segment 길이가 2.5 보다 짧으면 문제가 발생됨. buffer level 계산시 segment 번호가 이어지는 걸 고려하는 식으로
+        // 개선될 필요 있음.
+        const val = getBufferLength(getWorkingTime() || 0, 2.5);
+        return val;
+    }
+
     function updateBufferLevel() {
         if (playbackController) {
             bufferLevel = getBufferLength(getWorkingTime() || 0);
@@ -920,7 +930,8 @@ function BufferController(config) {
         getIsBufferingCompleted: getIsBufferingCompleted,
         switchInitData: switchInitData,
         getIsPruningInProgress: getIsPruningInProgress,
-        reset: reset
+        reset: reset,
+        getBufferLevelWithGap: getBufferLevelWithGap
     };
 
     setup();
